@@ -21,6 +21,7 @@ This document establishes the **mandatory, non-negotiable rules** for all AI age
   2. Contains only kernel sources/configs relevant to the variant: `arch/arm64/configs`, `drivers`, `fs`, `include`, `kernel`, `lib`, `mm`, `net`, `security`, `scripts`, `ksu-patches`, `.gitmodules` / `KernelSU` (submodule gitlink). **No** `build.sh`, `.github/`, `README*`, `AGENTS.md`, `CHANGELOG*` or `.gitignore` hunks.
   3. Defconfigs follow the resolver names (`begonia_apatch_defconfig`, `reksun_defconfig`, …).
   4. Root patches are applied before overlays; keep them independently applicable.
+  5. Fixes that belong inside the KernelSU submodule are **not** committed there: add them to `ksu-patches/ksu/*.patch`, which `build.sh` applies with `--directory=KernelSU` after the submodule checkout.
 * **Updating a patch** (the only sanctioned workflow):
   ```bash
   git checkout onyx && git pull

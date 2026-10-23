@@ -212,6 +212,30 @@ apply_variant_patches() {
     export APPLIED_PATCHES VARIANT_PATCHED
 }
 
+# KernelSU is kept as a pristine upstream submodule; local fixes live in
+# ksu-patches/<root>/ and are applied on top of the checkout. Paths inside
+# those patches are relative to the KernelSU submodule root.
+apply_root_patches() {
+    local dir="$ROOT_DIR/ksu-patches/$ROOT_FLAVOR"
+    [[ -d "$ROOT_DIR/KernelSU" && -d "$dir" ]] || return 0
+
+    local patch
+    shopt -s nullglob
+    for patch in "$dir"/*.patch; do
+        if git -C "$ROOT_DIR" apply --directory=KernelSU \
+                --reverse --check "$patch" >/dev/null 2>&1; then
+            log "KernelSU patch already applied: $(basename "$patch")"
+            continue
+        fi
+        log "Applying KernelSU patch: $(basename "$patch")"
+        if ! git -C "$ROOT_DIR" apply --directory=KernelSU "$patch"; then
+            err "Failed to apply ksu-patches/$ROOT_FLAVOR/$(basename "$patch")"
+            exit 1
+        fi
+    done
+    shopt -u nullglob
+}
+
 # Version Name / Codename (Rocks theme: Granite, Obsidian, Onyx)
 #
 # One resolver maps the selected variant (or branch/tag name) to an edition,
@@ -283,6 +307,7 @@ fi
 # Apply the selected variant before resolving the defconfig: the patch is what
 # adds root-specific defconfigs (begonia_apatch_defconfig, reksun_defconfig).
 apply_variant_patches
+apply_root_patches
 : "${APPLIED_PATCHES:=none}"
 export APPLIED_PATCHES
 log "Variant:      $VARIANT (root: $ROOT_FLAVOR, patches: $APPLIED_PATCHES)"

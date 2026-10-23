@@ -50,7 +50,7 @@ still builds the KSU edition.
 | Patch | Files | Notes |
 | --- | --- | --- |
 | `apatch.patch` | `begonia_apatch_defconfig`, `drivers/kernelsu` symlink, `fs/nomount/*` | used by both `apatch` and `folkpatch` |
-| `ksu.patch` | `.gitmodules` + `KernelSU` gitlink (ReSukiSU), `reksun_defconfig`, `fs/nomount/*`, `fs/susfs.c`, `ksu-patches/reksun/*` | root drivers, applied before overlays |
+| `ksu.patch` | `.gitmodules` + `KernelSU` gitlink (ReSukiSU), `reksun_defconfig`, `fs/nomount/*`, `fs/susfs.c`, `ksu-patches/ksu/*` | root drivers, applied before overlays |
 | `miui.patch` | WLAN drivers, `miui.config` | overlay |
 | `c2.patch` | MTK VCODEC/VCU, V4L2 uapi | overlay |
 
@@ -69,7 +69,9 @@ still builds the KSU edition.
 
    For a root that adds a submodule, keep the `KernelSU` gitlink and
    `.gitmodules` hunks; `build.sh` runs `git submodule update --init` after
-   applying the patch.
+   applying the patch. Fixes that must live inside the KernelSU submodule go
+   to `ksu-patches/ksu/*.patch` (applied by `build.sh` with
+   `--directory=KernelSU`), never into `KernelSU/` directly.
 
 3. Verify it applies to a clean tree:
 

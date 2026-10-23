@@ -10940,10 +10940,9 @@ index 0000000..f8eaeaa
 +#endif // #ifndef KSU_SUSFS_DEF_H
 \ No newline at end of file
 diff --git a/kernel/reboot.c b/kernel/reboot.c
-index 12f0c17..a89ba22 100644
 --- a/kernel/reboot.c
 +++ b/kernel/reboot.c
-@@ -17,6 +17,15 @@
+@@ -17,6 +17,17 @@
  #include <linux/syscore_ops.h>
  #include <linux/uaccess.h>
  
@@ -10952,6 +10951,8 @@ index 12f0c17..a89ba22 100644
 +#endif
 +
 +#ifdef CONFIG_KSU
++/* Must match KSU_INSTALL_MAGIC1 in uapi/supercall.h (KernelSU-Next). */
++#define KSU_INSTALL_MAGIC1 0xDEADBEEF
 +extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 +				void __user **arg);
 +#endif
@@ -10959,14 +10960,20 @@ index 12f0c17..a89ba22 100644
  /*
   * this indicates whether you can reboot with ctrl-alt-del: the default is yes
   */
-@@ -325,6 +334,12 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+@@ -291,6 +302,18 @@
  	char buffer[256];
  	int ret = 0;
  
 +#ifdef CONFIG_KSU
-+	ret = ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
-+	if (ret != -EINVAL)
-+		return ret;
++	/*
++	 * KernelSU supercalls ride on the reboot syscall under a private magic.
++	 * Only consume those; every other call (including normal restarts) must
++	 * fall through to the real reboot handling below.
++	 */
++	if (magic1 == KSU_INSTALL_MAGIC1) {
++		ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++		return 0;
++	}
 +#endif
 +
  	/* We only trust the superuser with rebooting the system. */
@@ -11164,11 +11171,11 @@ index 66c1fd2..1cfbbec 100644
  	if (error)
  		goto out;
  
-diff --git a/ksu-patches/reksun/0001-add-ksunext-manager-sign.patch b/ksu-patches/reksun/0001-add-ksunext-manager-sign.patch
+diff --git a/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch b/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch
 new file mode 100644
 index 0000000..77a7b72
 --- /dev/null
-+++ b/ksu-patches/reksun/0001-add-ksunext-manager-sign.patch
++++ b/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch
 @@ -0,0 +1,27 @@
 +diff --git a/kernel/manager/apk_sign.c b/kernel/manager/apk_sign.c
 +index b87461d..df97164 100644
