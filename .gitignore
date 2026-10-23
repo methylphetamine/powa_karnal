@@ -149,3 +149,6 @@ reboot-logs/
 !.agents/
 pox-manager/
 *.apk
+
+# Variant patch sets are first-class sources for the single-branch build system.
+!/variants/*.patch

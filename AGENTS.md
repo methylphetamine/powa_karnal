@@ -4,6 +4,37 @@ This document establishes the **mandatory, non-negotiable rules** for all AI age
 
 ---
 
+## 0. One Branch, Variants as Patches (READ FIRST)
+* **Single source branch**: All work lands on **`onyx`** (the default branch). There is exactly **one** long-lived branch. Do **not** create `onyx-ksun`, `onyx-miui`, `onyx-c2`, `onyx-apatch`, `onyx-bakasu` or any other per-variant branch, and do not push variant work to `main` (kept as a mirror during migration).
+* **Variants are patch sets**: Root flavors and media overlays live in `variants/` and are applied at build time by `build.sh`:
+  * Roots: `apatch.patch` (also used by `folkpatch`), `ksu.patch`; `vanilla` means no patch.
+  * Overlays: `miui.patch`, `c2.patch`
+* **Where a change belongs**:
+  * Shared kernel fixes, upstream syncs, defconfig baseline changes → commit directly on `onyx` (no patch).
+  * Anything that only exists because of a root flavor (KernelSU submodule, KSU/SuSFS/NoMount glue, root defconfig) → edit the matching `variants/<root>.patch` and regenerate it.
+  * Anything that only exists for a media overlay (WLAN/HyperOS knobs, MTK VCODEC/VCU stack) → edit `variants/<overlay>.patch`.
+  * Never mix variant-only code into the base tree "for convenience". That is what the patch is for.
+* **Roots**: `vanilla`, `apatch`, `folkpatch`, `ksu`. `apatch`/`folkpatch` bundle the matching KernelPatch manager APK and auto-flash it during kernel flash; `ksu` builds the ReSukiSU submodule with NoMount/SuSFS/KSU-Next manager sign; `vanilla` is the untouched base.
+* **Selecting a variant**: `VARIANT=<root>[,<overlay>] ./build.sh all` (e.g. `VARIANT=ksu,c2`, `VARIANT=folkpatch,miui`). CI does the same through the **Build & Release** workflow inputs (`root`, `miui`, `c2`). `miui` and `c2` are mutually exclusive.
+* **Patch contract** (enforced in review):
+  1. Applies to a clean `onyx` tree with `git apply --check variants/<name>.patch` — no fuzz, no `--3way`.
+  2. Contains only kernel sources/configs relevant to the variant: `arch/arm64/configs`, `drivers`, `fs`, `include`, `kernel`, `lib`, `mm`, `net`, `security`, `scripts`, `ksu-patches`, `.gitmodules` / `KernelSU` (submodule gitlink). **No** `build.sh`, `.github/`, `README*`, `AGENTS.md`, `CHANGELOG*` or `.gitignore` hunks.
+  3. Defconfigs follow the resolver names (`begonia_apatch_defconfig`, `reksun_defconfig`, …).
+  4. Root patches are applied before overlays; keep them independently applicable.
+* **Updating a patch** (the only sanctioned workflow):
+  ```bash
+  git checkout onyx && git pull
+  git diff --no-color onyx..<source-ref> -- \
+    arch/arm64/configs drivers fs include kernel lib mm net security scripts \
+    .gitmodules KernelSU > variants/<name>.patch
+  git apply --check variants/<name>.patch
+  VARIANT=<name> ./build.sh variants      # sizes + file counts
+  ```
+  Follow the Conventional Commit rules for the patch update (e.g. `fix(ksu): refresh susfs glue against onyx`).
+* **Never** hand-edit a patch hunk to "make it apply". Rebase the source change and regenerate the patch.
+
+---
+
 ## 1. Concurrency & Mutation Safety: NEVER Edit While a Task is Running
 * **Absolute File Freeze**: You must **NEVER** edit, create, delete, rebase, checkout, or stage any file while a build (`build.sh`, `make`), flash (`adb sideload`), test script, benchmark, or background process is actively executing.
 * **Corrupted Builds**: Modifying source files during compilation produces non-deterministic artifacts, broken headers, and invalid object states.
@@ -27,9 +58,10 @@ This document establishes the **mandatory, non-negotiable rules** for all AI age
 * **Linux 64-Character UTS_RELEASE Hard Limit**:
   * The Linux kernel enforces `UTS_RELEASE` length $\le 64$ characters.
   * Localversion strings must be clamped (e.g., `-Pox-1.0.0-Beta-<Edition>-<hash>`) to never exceed this limit.
-* **Strict Branch Isolation**:
-  * `CONFIG_SULTAN_DEBLOAT=y` is strictly exclusive to Sultan branches (`onyx-sultan*`). Never enable or leak it into standard `onyx*` branches.
-  * APatch, KernelSU-Next, and clean unrooted branches must remain cleanly separated. Do not mix root hooks or leave broken stubs.
+* **Strict Variant Isolation**:
+  * `CONFIG_SULTAN_DEBLOAT=y` is strictly exclusive to the `sultan` variant/patch. Never enable or leak it into the base tree or other variants.
+  * APatch, FolkPatch, KernelSU-Next and unrooted builds must remain cleanly separated: root hooks and defconfigs belong in their `variants/<root>.patch`, never in `onyx` itself.
+  * Overlays (`miui`, `c2`) must not be enabled together; their media code overlaps.
 * **Zero Leftovers**: Never leave debug printk floods, scratch scripts, or ad-hoc binaries in committed code.
 
 ---
@@ -53,6 +85,6 @@ Before submitting any Pull Request:
 1. [ ] **Build Validation**: The kernel compiles completely with zero errors and zero fatal warnings using the repo toolchain.
 2. [ ] **Packaging**: `build.sh zip` succeeds and produces a valid flashable AnyKernel3 package.
 3. [ ] **UTS_RELEASE Check**: `include/generated/utsrelease.h` is $\le 64$ characters.
-4. [ ] **Target Branch Verified**: The PR targets the correct branch in the 6-branch matrix (`onyx`, `onyx-apatch`, `onyx-ksu-next`, `onyx-sultan`, `onyx-sultan-apatch`, `onyx-sultan-ksu-next`).
+4. [ ] **Variant Correctness**: Base changes compile on `onyx`; variant changes were verified with `VARIANT=<root>[,<overlay>] ./build.sh all` (or at minimum `git apply --check variants/<name>.patch` + a CI run). Do not target per-variant branches — they no longer exist.
 5. [ ] **Clean Git History**: Commits follow Conventional Commits and contain no merge commits or WIP clutter.
 6. [ ] **No Regression**: Hardware charging limits, boot stability, and HAL sysctls are verified.

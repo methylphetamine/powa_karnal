@@ -1,58 +1,103 @@
-name: Build Kernel
+name: Build & Release
 
 on:
   push:
-    branches: [main]
+    branches: [onyx]
     tags: ['v*']
-  pull_request:
-    branches: [main]
-  # Releases are OPT-IN. A normal push/PR build only uploads workflow artifacts.
-  # The flashable zip is published as a release asset only when you either:
-  #   * push a v* tag, or
-  #   * run this workflow manually with the "release" input enabled.
   workflow_dispatch:
     inputs:
-      release:
-        description: 'Publish the flashable zip as a "latest" release asset'
-        type: boolean
+      root:
+        description: 'Root flavor (patches in variants/)'
+        required: true
+        default: vanilla
+        type: choice
+        options:
+          - vanilla
+          - apatch
+          - folkpatch
+          - ksu
+      miui:
+        description: 'Add MIUI/HyperOS overlay (mutually exclusive with Codec2)'
+        required: false
         default: false
+        type: boolean
+      c2:
+        description: 'Add Codec2 media overlay (mutually exclusive with MIUI)'
+        required: false
+        default: false
+        type: boolean
+      release:
+        description: 'Publish the flashable zip as a release asset'
+        required: false
+        default: false
+        type: boolean
 
-# Required so the workflow can create/update the GitHub Release that carries the
-# flashable zip as a directly-downloadable asset (no wrapper zip).
 permissions:
   contents: write
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ github.ref }}-${{ github.event.inputs.root || 'push' }}
   cancel-in-progress: true
 
 jobs:
   build:
     name: Build begonia kernel
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       KERNEL_NAME: MeTh-Kernel-begonia
       TC_ROOT: ${{ github.workspace }}/toolchains
       OUT_DIR: out
       # TheRagingBeast (TRB) Clang 18.0.0, pinned by kerdevdep/setup_kerdevdep.sh
       TRB_CLANG_VER: TheRagingBeast TRB Clang 18.0.0 (17092023)
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Variant patches add the KernelSU gitlink; build.sh initialises it
+          # after applying them.
+          submodules: false
+
+      - name: Resolve variant
+        id: variant
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ROOT="${{ inputs.root }}"
+            MIUI="${{ inputs.miui }}"
+            C2="${{ inputs.c2 }}"
+            if [[ "$MIUI" == "true" && "$C2" == "true" ]]; then
+              echo "::error::MIUI and Codec2 overlays rewrite the same vendor media code - enable at most one"
+              exit 1
+            fi
+            VARIANT="$ROOT"
+            [[ "$MIUI" == "true" ]] && VARIANT="$VARIANT,miui"
+            [[ "$C2" == "true" ]] && VARIANT="$VARIANT,c2"
+            LABEL="$VARIANT"
+          else
+            # Pushes/tags leave VARIANT unset: build.sh derives the edition from
+            # the ref name (onyx, onyx-ksu-next, onyx-miui, v1.0-c2, ...).
+            VARIANT=""
+            LABEL="${GITHUB_REF_NAME}"
+          fi
+
+          echo "VARIANT=$VARIANT" >> "$GITHUB_ENV"
+          echo "variant=${LABEL}" >> "$GITHUB_OUTPUT"
+          echo "Building variant: ${LABEL:-auto}"
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential ccache zip unzip cpio python3 flex bison \
-            libssl-dev bc dwarves zstd libelf-dev
+            bc bison build-essential ccache cpio curl dwarves flex g++-multilib \
+            gcc-multilib git gnupg gperf libelf-dev libncurses-dev libssl-dev \
+            lz4 make pahole python3 python-is-python3 unzip xz-utils zip zstd
 
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: begonia-${{ github.sha }}
+          key: begonia-${{ steps.variant.outputs.variant }}-${{ github.sha }}
 
       - name: Setup cache for toolchains
         id: toolchain-cache
@@ -65,87 +110,77 @@ jobs:
 
       - name: Build kernel
         run: |
-          export TC_ROOT="${{ github.workspace }}/toolchains"
+          set -euo pipefail
           export CCACHE_DIR="${{ runner.temp }}/ccache"
           chmod +x build.sh
-          ./build.sh
+          ./build.sh all
+
+          # build.sh is the single source of truth for artifact identity.
+          source build/build-info.env
+          {
+            echo "VARIANT=$VARIANT"
+            echo "ZIP_PATH=$ZIP_PATH"
+            echo "ZIP_NAME=$ZIP_NAME"
+            echo "VERSION_NAME=$VERSION_NAME"
+            echo "BRANCH_DESC=$BRANCH_DESC"
+            echo "ROOT_FLAVOR=$ROOT_FLAVOR"
+            echo "ROOT_ASSET=$ROOT_ASSET"
+            echo "APPLIED_PATCHES=$APPLIED_PATCHES"
+            echo "DEFCONFIG=$DEFCONFIG"
+            echo "COMMIT_HASH=$COMMIT_HASH"
+            echo "LINUX_VERSION=$LINUX_VERSION"
+            echo "LOCALVERSION=$LOCALVERSION"
+            echo "ZIP_SHA256=$ZIP_SHA256"
+          } >> "$GITHUB_ENV"
 
       - name: Verify APatch kallsyms requirements
         run: |
-          if ! grep -q '^CONFIG_KALLSYMS_ALL=y$' "$OUT_DIR/.config"; then
-            echo "::error::CONFIG_KALLSYMS_ALL is not set to y in $OUT_DIR/.config - APatch/KernelPatch requires it"
+          if grep -q '^CONFIG_KALLSYMS_ALL=y$' out/.config; then
+            echo "CONFIG_KALLSYMS_ALL=y confirmed"
+            grep -E '^#? ?CONFIG_KALLSYMS' out/.config || true
+          elif [[ "$ROOT_FLAVOR" == "apatch" || "$ROOT_FLAVOR" == "folkpatch" ]]; then
+            echo "::error::CONFIG_KALLSYMS_ALL is not set - APatch/KernelPatch requires it"
             exit 1
+          else
+            echo "::warning::CONFIG_KALLSYMS_ALL is not set (only required for APatch)"
           fi
-          echo "CONFIG_KALLSYMS_ALL=y confirmed"
-          grep -E '^#? ?CONFIG_KALLSYMS' "$OUT_DIR/.config" || true
 
-      # NOTE: GitHub always wraps artifact downloads in a .zip, which means the
-      # flashable zip arrives nested inside another zip. The release asset step
-      # below publishes the same zip so it downloads as-is and can be flashed
-      # straight away.
       - name: Upload flashable zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MeTh-Kernel-begonia-flashable
-          path: MeTh-Kernel-begonia-*.zip
+          name: ${{ env.ZIP_NAME }}
+          path: |
+            ${{ env.ZIP_PATH }}
+            build/Image.gz-dtb
           if-no-files-found: error
+          retention-days: 14
 
-      - name: Upload Image.gz-dtb
-        uses: actions/upload-artifact@v4
-        with:
-          name: Image.gz-dtb
-          path: out/arch/arm64/boot/Image.gz-dtb
-          if-no-files-found: error
-
-      - name: Resolve flashable zip path
-        id: zip
-        run: |
-          shopt -s nullglob
-          zips=(MeTh-Kernel-begonia-*.zip)
-          if (( ${#zips[@]} == 0 )); then
-            echo "::error::No MeTh-Kernel-begonia-*.zip was produced"
-            exit 1
-          fi
-          echo "name=${zips[0]}" >> "$GITHUB_OUTPUT"
-          echo "Flashable zip: ${zips[0]}"
-
-      # Release assets download directly (no wrapper zip).
-      # Runs ONLY for a v* tag push or a manual dispatch with release=true, so
-      # nothing is published until the build has been verified on device.
-      #  - tag push (v*)  -> release named after the tag, versioned asset name
-      #  - manual release -> rolling "latest" release with a stable asset name,
-      #                      so this URL always serves the newest build:
-      #                      .../releases/latest/download/MeTh-Kernel-begonia.zip
-      - name: Publish flashable zip as release asset
-        if: >-
-          github.event_name != 'pull_request' &&
-          (startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release == 'true')
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ZIP_NAME: ${{ steps.zip.outputs.name }}
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            tag="${GITHUB_REF_NAME}"
-            asset="$ZIP_NAME"
-            notes="MeTh-Kernel-begonia for Redmi Note 8 Pro (begonia) - ${GITHUB_REF_NAME}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="latest-${VERSION_NAME}"
           else
-            tag="latest"
-            asset="MeTh-Kernel-begonia.zip"
-            notes="MeTh-Kernel-begonia for Redmi Note 8 Pro (begonia) - rolling build from ${GITHUB_SHA::12}"
+            TAG="${GITHUB_REF_NAME}"
           fi
 
-          if [[ "$asset" != "$ZIP_NAME" ]]; then
-            cp -f "$ZIP_NAME" "$asset"
-          fi
+          TITLE="Pox Kernel ${LINUX_VERSION} [${VERSION_NAME}] (${COMMIT_HASH})"
+          NOTES="$(printf '%s\n' \
+            "**${VERSION_NAME}** - ${BRANCH_DESC}" \
+            "" \
+            "- Variant: \`${VARIANT}\` (root: ${ROOT_FLAVOR}, patches: ${APPLIED_PATCHES})" \
+            "- Root package: \`${ROOT_ASSET}\`" \
+            "- Defconfig: \`${DEFCONFIG}\`" \
+            "- uname -r: \`${LOCALVERSION}\`" \
+            "- Commit: \`${COMMIT_HASH}\`" \
+            "- SHA256: \`${ZIP_SHA256}\`" \
+            "" \
+            "Flash \`${ZIP_NAME}\` in TWRP/OrangeFox (boot partition).")"
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$asset" --clobber
-            gh release edit "$tag" --notes "$notes"
-          else
-            gh release create "$tag" "$asset" \
-              --title "$tag" \
-              --notes "$notes"
-          fi
-
-          echo "Release asset: $(gh release view "$tag" --json url --jq .url)"
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"
+          gh release upload "$TAG" "$ZIP_PATH" build/Image.gz-dtb \
+            -R "$GITHUB_REPOSITORY" --clobber
