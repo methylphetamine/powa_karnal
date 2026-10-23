@@ -1799,6 +1799,15 @@ static void mtk_chg_get_tchg(struct charger_manager *info)
 	}
 }
 
+/* =========================================================================
+ * Smart Battery Guard & Direct Power Bypass Charging Engine
+ * ========================================================================= */
+static int g_battery_bypass_mode = 0;      /* 0 = normal charging, 1 = direct bypass power */
+static int g_battery_charge_limit = 100;   /* default 100% (limit disabled, charges to 100) */
+static int g_battery_thermal_guard = 0;    /* 0 = disabled by default (JEITA handles thermal regulation) */
+static int g_battery_temp_limit = 460;     /* 46.0°C thermal ceiling if thermal guard manually enabled */
+static int g_battery_bypass_reason = 0;   /* 0=none, 1=manual, 2=cap_limit, 3=thermal */
+
 static void charger_check_status(struct charger_manager *info)
 {
 	bool charging = true;
@@ -1866,7 +1875,77 @@ static void charger_check_status(struct charger_manager *info)
 
 	if (!mtk_chg_check_vbus(info)) {
 		charging = false;
+		g_battery_bypass_reason = 0;
 		goto stop_charging;
+	}
+
+	/* Smart Battery Guard & Direct Power Bypass Evaluation.
+	 * Pox health-adaptive + anti-spike: all features kept (manual
+	 * bypass, 50..100 cap with 5% hysteresis, thermal guard with 2C
+	 * hysteresis). Overrides only in dangerous regions to stop
+	 * VSYS droop freezes and over-voltage swelling:
+	 * - vbat>4450mV: stop charging (OVP spike guard, 50mV hysteresis)
+	 * - vbat<3300mV or uisoc<20: force charging, ignore bypass
+	 *   (UVLO/brownout guard, prevents call/game reboot freeze)
+	 * - uisoc>30 but vbat<3500mV: weak/aged high-ESR sag -> force
+	 *   gentle charging, no bypass flapping (smooth experience)
+	 * Hysteresis on every override stops power-path oscillation
+	 * that causes current spikes and UI freezes. */
+	{
+		int uisoc = battery_get_uisoc();
+		int vbat = battery_get_bat_voltage(); /* mV */
+		static bool vhigh_hold, vlow_hold, lowsoc_hold, weak_hold;
+
+		if (vbat > 4450)
+			vhigh_hold = true;
+		else if (vbat < 4400)
+			vhigh_hold = false;
+
+		if (vbat < 3300)
+			vlow_hold = true;
+		else if (vbat > 3350)
+			vlow_hold = false;
+
+		if (uisoc < 20)
+			lowsoc_hold = true;
+		else if (uisoc > 22)
+			lowsoc_hold = false;
+
+		if (uisoc > 30 && vbat < 3500)
+			weak_hold = true;
+		else if (vbat > 3600 || uisoc <= 30)
+			weak_hold = false;
+
+		if (vhigh_hold) {
+			charging = false;
+			g_battery_bypass_reason = 3; /* Over-voltage guard */
+			chr_err("[POX_BATT] health guard: VBAT %dmV over-voltage, charging held off\n", vbat);
+		} else if (vlow_hold || lowsoc_hold) {
+			charging = true;
+			g_battery_bypass_reason = 0; /* UVLO guard: keep VSYS supported */
+			if (g_battery_bypass_mode)
+				chr_err("[POX_BATT] health guard: soc %d vbat %dmV low, bypass deferred to avoid brownout freeze\n", uisoc, vbat);
+		} else if (weak_hold) {
+			charging = true;
+			g_battery_bypass_reason = 0; /* Aged/high-ESR sag: gentle charge, no path flapping */
+			if (g_battery_bypass_mode)
+				chr_err("[POX_BATT] health guard: weak sag soc %d vbat %dmV, bypass deferred for smooth power\n", uisoc, vbat);
+		} else if (g_battery_bypass_mode) {
+			charging = false;
+			g_battery_bypass_reason = 1; /* Manual Direct Power Bypass */
+		} else if (g_battery_charge_limit < 100 && uisoc >= g_battery_charge_limit) {
+			charging = false;
+			g_battery_bypass_reason = 2; /* Charge Limit Cap Reached */
+		} else if (g_battery_bypass_reason == 2 && uisoc > (g_battery_charge_limit - 5)) {
+			charging = false; /* Maintain bypass until 5% hysteresis drop */
+		} else if (g_battery_thermal_guard && temperature >= g_battery_temp_limit) {
+			charging = false;
+			g_battery_bypass_reason = 3; /* Thermal Guard Active */
+		} else if (g_battery_bypass_reason == 3 && temperature > (g_battery_temp_limit - 20)) {
+			charging = false; /* Maintain until cooled down by 2.0°C */
+		} else {
+			g_battery_bypass_reason = 0;
+		}
 	}
 
 	if (info->cmd_discharging)
@@ -3359,6 +3438,202 @@ static ssize_t mtk_chg_en_safety_timer_write(struct file *file,
 	return count;
 }
 
+static ssize_t bypass_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", g_battery_bypass_mode);
+}
+
+static ssize_t bypass_mode_store(struct kobject *kobj, struct kobj_attribute *attr,
+				  const char *buf, size_t count)
+{
+	int val = 0;
+	if (kstrtoint(buf, 10, &val) == 0) {
+		g_battery_bypass_mode = (val != 0) ? 1 : 0;
+		if (pinfo)
+			_wake_up_charger(pinfo);
+	}
+	return count;
+}
+
+static ssize_t charge_limit_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", g_battery_charge_limit);
+}
+
+static ssize_t charge_limit_store(struct kobject *kobj, struct kobj_attribute *attr,
+				   const char *buf, size_t count)
+{
+	int val = 0;
+	if (kstrtoint(buf, 10, &val) == 0) {
+		if (val <= 0 || val >= 100)
+			val = 100;
+		else if (val < 50)
+			val = 100; /* Any value < 50 is not an SoC cap (e.g. 0/disabled from HAL), treat as unlimited */
+
+		g_battery_charge_limit = val;
+		if (g_battery_bypass_reason == 2 && (val >= 100 || battery_get_uisoc() < val))
+			g_battery_bypass_reason = 0;
+		if (pinfo)
+			_wake_up_charger(pinfo);
+	}
+	return count;
+}
+
+static ssize_t thermal_guard_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", g_battery_thermal_guard);
+}
+
+static ssize_t thermal_guard_store(struct kobject *kobj, struct kobj_attribute *attr,
+				    const char *buf, size_t count)
+{
+	int val = 0;
+	if (kstrtoint(buf, 10, &val) == 0) {
+		g_battery_thermal_guard = (val != 0) ? 1 : 0;
+		if (pinfo)
+			_wake_up_charger(pinfo);
+	}
+	return count;
+}
+
+static ssize_t temp_limit_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", g_battery_temp_limit / 10);
+}
+
+static ssize_t temp_limit_store(struct kobject *kobj, struct kobj_attribute *attr,
+				 const char *buf, size_t count)
+{
+	int val = 0;
+	if (kstrtoint(buf, 10, &val) == 0) {
+		if (val < 30) val = 30;
+		if (val > 55) val = 55;
+		g_battery_temp_limit = val * 10;
+		if (pinfo)
+			_wake_up_charger(pinfo);
+	}
+	return count;
+}
+
+static ssize_t battery_protect_status_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	if (!pinfo || !mtk_chg_check_vbus(pinfo))
+		return sprintf(buf, "DISCHARGING (ON BATTERY)\n");
+	if (g_battery_bypass_reason == 1)
+		return sprintf(buf, "BYPASS_MODE (RUNNING 100%% ON CHARGER, BATTERY IDLE)\n");
+	if (g_battery_bypass_reason == 2)
+		return sprintf(buf, "CHARGE_LIMIT_REACHED (RUNNING ON CHARGER, CAP %d%%)\n", g_battery_charge_limit);
+	if (g_battery_bypass_reason == 3)
+		return sprintf(buf, "THERMAL_GUARD_ACTIVE (RUNNING ON CHARGER, TEMP >= %dC)\n", g_battery_temp_limit / 10);
+	return sprintf(buf, "CHARGING (FAST/NORMAL)\n");
+}
+
+int pox_battery_bypass_get(void)
+{
+	return g_battery_bypass_mode;
+}
+EXPORT_SYMBOL(pox_battery_bypass_get);
+
+void pox_battery_bypass_set(int enable)
+{
+	g_battery_bypass_mode = enable ? 1 : 0;
+	if (pinfo)
+		_wake_up_charger(pinfo);
+}
+EXPORT_SYMBOL(pox_battery_bypass_set);
+
+int pox_battery_limit_get(void)
+{
+	return g_battery_charge_limit;
+}
+EXPORT_SYMBOL(pox_battery_limit_get);
+
+void pox_battery_limit_set(int limit)
+{
+	if (limit <= 0 || limit >= 100)
+		limit = 100;
+	else if (limit < 50)
+		limit = 100; /* Any value < 50 (like 0 from LineageHealth when no limit is active) means 100% full charge */
+
+	g_battery_charge_limit = limit;
+	if (g_battery_bypass_reason == 2 && (limit >= 100 || battery_get_uisoc() < limit))
+		g_battery_bypass_reason = 0;
+	if (pinfo)
+		_wake_up_charger(pinfo);
+}
+EXPORT_SYMBOL(pox_battery_limit_set);
+
+int pox_battery_status_get(char *buf, size_t size)
+{
+	if (!pinfo || !mtk_chg_check_vbus(pinfo))
+		return scnprintf(buf, size, "DISCHARGING (ON BATTERY)\n");
+	if (g_battery_bypass_reason == 1)
+		return scnprintf(buf, size, "BYPASS_MODE (RUNNING 100%% ON CHARGER, BATTERY IDLE)\n");
+	if (g_battery_bypass_reason == 2)
+		return scnprintf(buf, size, "CHARGE_LIMIT_REACHED (RUNNING ON CHARGER, CAP %d%%)\n", g_battery_charge_limit);
+	if (g_battery_bypass_reason == 3)
+		return scnprintf(buf, size, "THERMAL_GUARD_ACTIVE (RUNNING ON CHARGER, TEMP >= %dC)\n", g_battery_temp_limit / 10);
+	return scnprintf(buf, size, "CHARGING (FAST/NORMAL)\n");
+}
+EXPORT_SYMBOL(pox_battery_status_get);
+
+static int g_battery_fast_charge = 1;
+
+int pox_fast_charge_get(void)
+{
+	return g_battery_fast_charge;
+}
+EXPORT_SYMBOL(pox_fast_charge_get);
+
+void pox_fast_charge_set(int enable)
+{
+	g_battery_fast_charge = enable ? 1 : 0;
+	if (pinfo)
+		_wake_up_charger(pinfo);
+}
+EXPORT_SYMBOL(pox_fast_charge_set);
+
+static ssize_t battery_protect_soc_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", battery_get_uisoc());
+}
+
+static ssize_t battery_protect_temp_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	int temp = pinfo ? pinfo->battery_temp : 0;
+	return sprintf(buf, "%d.%d\n", temp / 10, abs(temp % 10));
+}
+
+static struct kobj_attribute bypass_mode_kattr =
+	__ATTR(bypass_mode, 0664, bypass_mode_show, bypass_mode_store);
+static struct kobj_attribute charge_limit_kattr =
+	__ATTR(charge_limit, 0664, charge_limit_show, charge_limit_store);
+static struct kobj_attribute thermal_guard_kattr =
+	__ATTR(thermal_guard, 0664, thermal_guard_show, thermal_guard_store);
+static struct kobj_attribute temp_limit_kattr =
+	__ATTR(temp_limit, 0664, temp_limit_show, temp_limit_store);
+static struct kobj_attribute status_kattr =
+	__ATTR(status, 0444, battery_protect_status_show, NULL);
+static struct kobj_attribute soc_kattr =
+	__ATTR(battery_soc, 0444, battery_protect_soc_show, NULL);
+static struct kobj_attribute temp_kattr =
+	__ATTR(battery_temp, 0444, battery_protect_temp_show, NULL);
+
+static struct attribute *battery_protect_attrs[] = {
+	&bypass_mode_kattr.attr,
+	&charge_limit_kattr.attr,
+	&thermal_guard_kattr.attr,
+	&temp_limit_kattr.attr,
+	&status_kattr.attr,
+	&soc_kattr.attr,
+	&temp_kattr.attr,
+	NULL,
+};
+
+static struct attribute_group battery_protect_attr_group = {
+	.attrs = battery_protect_attrs,
+};
+
 /* PROC_FOPS_RW(battery_cmd); */
 /* PROC_FOPS_RW(discharging_cmd); */
 PROC_FOPS_RW(current_cmd);
@@ -3428,6 +3703,16 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 			&mtk_chg_en_power_path_fops, info);
 	proc_create_data("en_safety_timer", 0644, battery_dir,
 			&mtk_chg_en_safety_timer_fops, info);
+
+	/* Register /sys/kernel/battery_protection sysfs interface */
+	{
+		struct kobject *bp_kobj = kobject_create_and_add("battery_protection", kernel_kobj);
+		if (bp_kobj) {
+			int bp_ret = sysfs_create_group(bp_kobj, &battery_protect_attr_group);
+			if (bp_ret)
+				chr_err("failed to create battery_protection sysfs group: %d\n", bp_ret);
+		}
+	}
 
 _out:
 	return ret;

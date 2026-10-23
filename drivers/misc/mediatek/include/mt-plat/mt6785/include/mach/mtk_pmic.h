@@ -25,7 +25,7 @@
 /* Define for disable low battery protect feature,
  * default no define for enable low battery protect.
  */
-//#define DISABLE_LOW_BATTERY_PROTECT
+#define DISABLE_LOW_BATTERY_PROTECT
 
 /*Define for disable battery OC protect*/
 #define DISABLE_BATTERY_OC_PROTECT
@@ -37,26 +37,27 @@
 #define DISABLE_DLPT_FEATURE
 #endif /* defined(CONFIG_FPGA_EARLY_PORTING) || PT_DLPT_BRINGUP */
 
-//#define DISABLE_LOW_BATTERY_PROTECT
-#define DISABLE_BATTERY_OC_PROTECT
+#define DISABLE_LOW_BATTERY_PROTECT
+/* Enable BATTERY_OC_PROTECT to prevent >5.5A spikes that collapse battery voltage into 2sec_reboot */
+//#define DISABLE_BATTERY_OC_PROTECT
 #define DISABLE_BATTERY_PERCENT_PROTECT
 #define DISABLE_DLPT_FEATURE
 
 #define POWER_UVLO_VOLT_LEVEL 2600
 #define IMAX_MAX_VALUE 5500
 
-#define POWER_INT0_VOLT 3400
-#define POWER_INT1_VOLT 3250
-#define POWER_INT2_VOLT 3100
+#define POWER_INT0_VOLT 3300
+#define POWER_INT1_VOLT 3150
+#define POWER_INT2_VOLT 3000
 
 #define POWER_BAT_OC_CURRENT_H    5800
 #define POWER_BAT_OC_CURRENT_L    6300
 
 #define DLPT_POWER_OFF_EN
 #define POWEROFF_BAT_CURRENT 3000
-#define DLPT_POWER_OFF_THD 100
+#define DLPT_POWER_OFF_THD 0
 
-#define DLPT_VOLT_MIN 3100
+#define DLPT_VOLT_MIN 3000
 
 #define BATTERY_MODULE_INIT
 

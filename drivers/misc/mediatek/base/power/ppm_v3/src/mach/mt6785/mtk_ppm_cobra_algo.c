@@ -50,6 +50,7 @@ void eara_pass_perf_first_hint(int enable)
 {
 	is_perf_fist = enable;
 }
+EXPORT_SYMBOL(eara_pass_perf_first_hint);
 
 static unsigned int get_idx_in_pwr_tbl(enum ppm_cluster cluster)
 {
@@ -576,13 +577,13 @@ prepare_next_round:
 			/* TODO: check this! */
 #if PPM_COBRA_USE_CORE_LIMIT
 			if (opp[PPM_CLUSTER_B] == PPM_COBRA_MAX_FREQ_IDX
-			&& ACT_CORE(B) > 0) {
+			&& ACT_CORE(B) > 1) {
 				req->limit[PPM_CLUSTER_B].max_cpu_core =
 				--ACT_CORE(B);
 				opp[PPM_CLUSTER_B] = PPM_COBRA_MAX_FREQ_IDX - 1;
 			} else if (opp[PPM_CLUSTER_L] ==
 				PPM_COBRA_MAX_FREQ_IDX) {
-				if (ACT_CORE(L) > 1)
+				if (ACT_CORE(L) > 4)
 					req->limit[PPM_CLUSTER_L].max_cpu_core =
 					--ACT_CORE(L);
 				opp[PPM_CLUSTER_L] = PPM_COBRA_MAX_FREQ_IDX - 1;

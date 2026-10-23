@@ -15,6 +15,9 @@
 #endif
 #include <linux/kthread.h>
 #include <linux/sched.h>
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
+#include <linux/capability.h>
 
 #include <sound/soc.h>
 #include <sound/tlv.h>
@@ -1018,7 +1021,7 @@ static int ul_pga_set(struct snd_kcontrol *kcontrol,
 	unsigned int id = kcontrol->id.device;
 
 	dev_info(priv->dev, "%s(), id %d, index %d\n", __func__, id, index);
-	if (index > ARRAY_SIZE(ul_pga_gain)) {
+	if (index >= ARRAY_SIZE(ul_pga_gain)) {
 		dev_warn(priv->dev, "return -EINVAL\n");
 		return -EINVAL;
 	}
@@ -6889,6 +6892,112 @@ static int get_hp_current_calibrate_val(struct mt6359_priv *priv)
 	return value;
 }
 
+static struct mt6359_priv *s_mt6359_priv;
+static int s_headphone_gain_boost = 0;
+
+int pox_headphone_gain_set(int boost_db)
+{
+	int reg_idx;
+	if (boost_db < 0) boost_db = 0;
+	if (boost_db > 8) boost_db = 8;
+	s_headphone_gain_boost = boost_db;
+
+	/* In MT6359, index 8 is 0dB, index 0 is +8dB */
+	reg_idx = 8 - s_headphone_gain_boost;
+	if (s_mt6359_priv && s_mt6359_priv->regmap) {
+		regmap_update_bits(s_mt6359_priv->regmap, MT6359_ZCD_CON2,
+				   RG_AUDHPLGAIN_MASK_SFT,
+				   reg_idx << RG_AUDHPLGAIN_SFT);
+		regmap_update_bits(s_mt6359_priv->regmap, MT6359_ZCD_CON2,
+				   RG_AUDHPRGAIN_MASK_SFT,
+				   reg_idx << RG_AUDHPRGAIN_SFT);
+		s_mt6359_priv->ana_gain[AUDIO_ANALOG_VOLUME_HPOUTL] = reg_idx;
+		s_mt6359_priv->ana_gain[AUDIO_ANALOG_VOLUME_HPOUTR] = reg_idx;
+		pr_info("Headphone analog gain boost set to +%ddB (reg_idx=%d)\n", s_headphone_gain_boost, reg_idx);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(pox_headphone_gain_set);
+
+int pox_headphone_gain_get(void)
+{
+	return s_headphone_gain_boost;
+}
+EXPORT_SYMBOL(pox_headphone_gain_get);
+
+static ssize_t sound_control_hp_gain_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", pox_headphone_gain_get());
+}
+
+static ssize_t sound_control_hp_gain_store(struct kobject *kobj, struct kobj_attribute *attr,
+					   const char *buf, size_t count)
+{
+	int val = 0;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (kstrtoint(buf, 10, &val) == 0)
+		pox_headphone_gain_set(val);
+	return count;
+}
+
+static struct kobj_attribute hp_gain_kattr =
+	__ATTR(headphone_gain, 0644, sound_control_hp_gain_show, sound_control_hp_gain_store);
+
+static int s_mic_gain_boost = 3;
+
+int pox_mic_gain_get(void)
+{
+	return s_mic_gain_boost;
+}
+EXPORT_SYMBOL(pox_mic_gain_get);
+
+int pox_mic_gain_set(int gain)
+{
+	if (gain < 0) gain = 0;
+	if (gain > 4) gain = 4;
+	s_mic_gain_boost = gain;
+	if (s_mt6359_priv) {
+		s_mt6359_priv->ana_gain[AUDIO_ANALOG_VOLUME_MICAMP1] = gain;
+		s_mt6359_priv->ana_gain[AUDIO_ANALOG_VOLUME_MICAMP2] = gain;
+		s_mt6359_priv->ana_gain[AUDIO_ANALOG_VOLUME_MICAMP3] = gain;
+		regmap_update_bits(s_mt6359_priv->regmap, MT6359_AUDENC_ANA_CON0,
+				   RG_AUDPREAMPLGAIN_MASK_SFT,
+				   gain << RG_AUDPREAMPLGAIN_SFT);
+		regmap_update_bits(s_mt6359_priv->regmap, MT6359_AUDENC_ANA_CON1,
+				   RG_AUDPREAMPRGAIN_MASK_SFT,
+				   gain << RG_AUDPREAMPRGAIN_SFT);
+		regmap_update_bits(s_mt6359_priv->regmap, MT6359_AUDENC_ANA_CON2,
+				   RG_AUDPREAMP3GAIN_SFT,
+				   gain << RG_AUDPREAMP3GAIN_SFT);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(pox_mic_gain_set);
+
+static ssize_t sound_control_mic_gain_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", pox_mic_gain_get());
+}
+
+static ssize_t sound_control_mic_gain_store(struct kobject *kobj, struct kobj_attribute *attr,
+					    const char *buf, size_t count)
+{
+	int val = 0;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (kstrtoint(buf, 10, &val) == 0)
+		pox_mic_gain_set(val);
+	return count;
+}
+
+static struct kobj_attribute mic_gain_kattr =
+	__ATTR(mic_gain, 0644, sound_control_mic_gain_show, sound_control_mic_gain_store);
+
 static int mt6359_codec_probe(struct snd_soc_codec *codec)
 {
 	struct snd_soc_component *cmpnt = &codec->component;
@@ -6919,6 +7028,19 @@ static int mt6359_codec_probe(struct snd_soc_codec *codec)
 	priv->ana_gain[AUDIO_ANALOG_VOLUME_MICAMP3] = 3;
 
 	priv->hp_current_calibrate_val = get_hp_current_calibrate_val(priv);
+
+	s_mt6359_priv = priv;
+	{
+		struct kobject *sc_kobj = kobject_create_and_add("sound_control", kernel_kobj);
+		if (sc_kobj) {
+			int sc_ret = sysfs_create_file(sc_kobj, &hp_gain_kattr.attr);
+			if (sc_ret)
+				dev_warn(priv->dev, "failed to create /sys/kernel/sound_control/headphone_gain: %d\n", sc_ret);
+			sc_ret = sysfs_create_file(sc_kobj, &mic_gain_kattr.attr);
+			if (sc_ret)
+				dev_warn(priv->dev, "failed to create /sys/kernel/sound_control/mic_gain: %d\n", sc_ret);
+		}
+	}
 
 	return 0;
 }

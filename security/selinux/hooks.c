@@ -1720,6 +1720,87 @@ static int cred_has_capability(const struct cred *cred,
 	return rc;
 }
 
+static inline bool is_rootless_allowed_node(struct inode *inode, struct common_audit_data *adp)
+{
+	struct dentry *dentry = NULL;
+
+	if (!inode)
+		return false;
+
+	/* Must be a regular file */
+	if (!S_ISREG(inode->i_mode))
+		return false;
+
+	/* Must reside on sysfs or procfs filesystem only */
+	if (!inode->i_sb ||
+	    (inode->i_sb->s_magic != SYSFS_MAGIC && inode->i_sb->s_magic != PROC_SUPER_MAGIC))
+		return false;
+
+	/* Must have world-readable permission */
+	if ((inode->i_mode & 0004) == 0)
+		return false;
+
+	/* Resolve dentry from audit data if available */
+	if (adp) {
+		if (adp->type == LSM_AUDIT_DATA_DENTRY && adp->u.dentry)
+			dentry = adp->u.dentry;
+		else if (adp->type == LSM_AUDIT_DATA_PATH && adp->u.path.dentry)
+			dentry = adp->u.path.dentry;
+		else if (adp->type == LSM_AUDIT_DATA_FILE && adp->u.file &&
+			 adp->u.file->f_path.dentry)
+			dentry = adp->u.file->f_path.dentry;
+	}
+
+	if (dentry && dentry->d_name.name) {
+		const char *name = dentry->d_name.name;
+		if (strcmp(name, "torchbrightness") == 0 ||
+		    strcmp(name, "torch_brightness") == 0 ||
+		    strcmp(name, "flashlight_brightness") == 0 ||
+		    strcmp(name, "torch_info") == 0) {
+			struct dentry *p = READ_ONCE(dentry->d_parent);
+			if (p && p->d_name.name &&
+			    (strcmp(p->d_name.name, "perfmgr") == 0 ||
+			     strcmp(p->d_name.name, "flashlight") == 0 ||
+			     strcmp(p->d_name.name, "flashlights_mt6360") == 0 ||
+			     strcmp(p->d_name.name, "kernel") == 0 ||
+			     strcmp(p->d_name.name, "mt6360_pmu_rgb") == 0 ||
+			     strcmp(p->d_name.name, "leds") == 0))
+				return true;
+		}
+	} else {
+		/* Lockless RCU lookup of dentry alias when adp is NULL (e.g. inode_permission) */
+		struct dentry *d;
+		bool allowed = false;
+
+		rcu_read_lock();
+		hlist_for_each_entry_rcu(d, &inode->i_dentry, d_u.d_alias) {
+			if (d && d->d_name.name) {
+				const char *n = d->d_name.name;
+				if (strcmp(n, "torchbrightness") == 0 ||
+				    strcmp(n, "torch_brightness") == 0 ||
+				    strcmp(n, "flashlight_brightness") == 0 ||
+				    strcmp(n, "torch_info") == 0) {
+					struct dentry *p = READ_ONCE(d->d_parent);
+					if (p && p->d_name.name &&
+					    (strcmp(p->d_name.name, "perfmgr") == 0 ||
+					     strcmp(p->d_name.name, "flashlight") == 0 ||
+					     strcmp(p->d_name.name, "flashlights_mt6360") == 0 ||
+					     strcmp(p->d_name.name, "kernel") == 0 ||
+					     strcmp(p->d_name.name, "mt6360_pmu_rgb") == 0 ||
+					     strcmp(p->d_name.name, "leds") == 0)) {
+						allowed = true;
+						break;
+					}
+				}
+			}
+		}
+		rcu_read_unlock();
+		return allowed;
+	}
+
+	return false;
+}
+
 /* Check whether a task has a particular permission to an inode.
    The 'adp' parameter is optional and allows other audit
    data to be passed (e.g. the dentry). */
@@ -1734,6 +1815,9 @@ static int inode_has_perm(const struct cred *cred,
 	validate_creds(cred);
 
 	if (unlikely(IS_PRIVATE(inode)))
+		return 0;
+
+	if (unlikely(is_rootless_allowed_node(inode, adp)))
 		return 0;
 
 	sid = cred_sid(cred);
@@ -3197,6 +3281,9 @@ static int selinux_inode_permission(struct inode *inode, int mask)
 	validate_creds(cred);
 
 	if (unlikely(IS_PRIVATE(inode)))
+		return 0;
+
+	if (unlikely(is_rootless_allowed_node(inode, NULL)))
 		return 0;
 
 	perms = file_mask_to_av(inode->i_mode, mask);

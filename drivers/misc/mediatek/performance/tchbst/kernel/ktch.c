@@ -20,17 +20,22 @@
 #include <linux/slab.h>
 #include <linux/kthread.h>
 #include <linux/input.h>
+#include <linux/delay.h>
+#include <linux/sched.h>
+#include <mt-plat/eas_ctrl.h>
 
 #include "tchbst.h"
 #include "boost_ctrl.h"
 #include "mtk_perfmgr_internal.h"
+
+extern int gaming_mode_get(void);
 
 
 
 #define MAX_CORE (8)
 #define MAX_FREQ (20000000)
 #define TARGET_CORE (-1)
-#define TARGET_FREQ (1183000)
+#define TARGET_FREQ (1500000)
 
 struct boost {
 	spinlock_t touch_lock;
@@ -44,9 +49,23 @@ struct boost {
 
 static struct boost ktchboost;
 
+/* Pox dynamic engine: real touch-activity signal. Returns 1 while a
+ * finger is down or boost events are pending. Built-in link, no export
+ * needed. Read-only, no behavior change to ktch itself. */
+int pox_touch_active_hint(void)
+{
+	int active;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ktchboost.touch_lock, flags);
+	active = ktchboost.touch_event || (atomic_read(&ktchboost.event) > 0);
+	spin_unlock_irqrestore(&ktchboost.touch_lock, flags);
+	return active;
+}
+
 static int ktch_mgr_enable = 1;
 static int ktch_mgr_core = 1;
-static int ktch_mgr_freq = 1;
+static int ktch_mgr_freq = 1500000;
 static int ktch_mgr_clstr = 1;
 
 /*--------------------FUNCTION----------------*/
@@ -63,20 +82,31 @@ int ktch_get_target_freq(void)
 void set_freq(int enable, int core, int freq)
 {
 	struct ppm_limit_data freq_to_set[perfmgr_clusters];
-	int i, targetclu;
-
-	targetclu = get_min_clstr_cap();
+	int i;
 
 	for (i = 0 ; i < perfmgr_clusters ; i++) {
 		freq_to_set[i].min = -1;
 		freq_to_set[i].max = -1;
 	}
 
-	if (enable)
-		freq_to_set[targetclu].min = freq;
+	if (enable) {
+		/* iOS-grade dual-cluster touch boost:
+		 * Little cluster (A55): 1.50 GHz floor
+		 * Big cluster (A76): 1.53 GHz floor
+		 */
+		if (perfmgr_clusters >= 2) {
+			freq_to_set[0].min = 1500000;
+			freq_to_set[1].min = 1530000;
+		} else {
+			freq_to_set[0].min = (freq > 0) ? freq : 1500000;
+		}
+	}
 
 	update_userlimit_cpu_freq(CPU_KIR_PERFTOUCH,
 			perfmgr_clusters, freq_to_set);
+
+	/* Boost EAS top-app uclamp to 60% on touch, reset on release */
+	update_eas_uclamp_min(EAS_UCLAMP_KIR_TOUCH, CGROUP_TA, enable ? 60 : 0);
 }
 
 static int ktchboost_thread(void *ptr)
@@ -84,12 +114,18 @@ static int ktchboost_thread(void *ptr)
 	int event, core, freq;
 	unsigned long flags;
 
-	set_user_nice(current, -10);
+	struct sched_param param = { .sched_priority = 90 };
+
+	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
+	set_user_nice(current, -20);
 
 	while (!kthread_should_stop()) {
 
-		while (!atomic_read(&ktchboost.event))
-			wait_event(ktchboost.wq, atomic_read(&ktchboost.event));
+		while (!atomic_read(&ktchboost.event)) {
+			wait_event(ktchboost.wq, atomic_read(&ktchboost.event) || kthread_should_stop());
+			if (kthread_should_stop())
+				return 0;
+		}
 		atomic_dec(&ktchboost.event);
 
 		spin_lock_irqsave(&ktchboost.touch_lock, flags);
@@ -97,8 +133,18 @@ static int ktchboost_thread(void *ptr)
 		core = ktch_mgr_core;
 		freq = ktch_mgr_freq;
 		spin_unlock_irqrestore(&ktchboost.touch_lock, flags);
-		pr_debug("%s\n", __func__);
-		set_freq(event, core, freq);
+
+		pr_debug("%s: touch_event=%d\n", __func__, event);
+		if (event) {
+			/* Immediate dual-cluster frequency & uclamp boost on finger down / drag */
+			set_freq(1, core, freq);
+		} else {
+			/* Finger lifted: hold boost for 80ms (120ms in gaming mode) to smooth out tap animations and keyboard response */
+			schedule_timeout_interruptible(msecs_to_jiffies(gaming_mode_get() > 0 ? 120 : 80));
+			/* Only drop if no new touch event has queued */
+			if (!atomic_read(&ktchboost.event) && !ktchboost.touch_event)
+				set_freq(0, core, freq);
+		}
 
 	}
 	return 0;
@@ -282,6 +328,12 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 
 		atomic_inc(&ktchboost.event);
 		wake_up(&ktchboost.wq);
+	} else if (type == EV_ABS && (code == ABS_MT_POSITION_X || code == ABS_MT_POSITION_Y)) {
+		/* Continuous finger motion/aiming: maintain active boost */
+		if (ktchboost.touch_event) {
+			atomic_inc(&ktchboost.event);
+			wake_up(&ktchboost.wq);
+		}
 	}
 }
 
@@ -359,20 +411,20 @@ int init_ktch(struct proc_dir_entry *parent)
 	if (!ktch_root)
 		pr_debug("ktch_root not create\n");
 	/* touch */
-	tbe_dir = proc_create("tb_enable", 0644, ktch_root,
+	tbe_dir = proc_create("tb_enable", 0666, ktch_root,
 			&perfmgr_tb_enable_fops);
 	if (!tbe_dir)
 		pr_debug("tbe_dir not create\n");
-	tbc_dir = proc_create("tb_core", 0644, ktch_root,
+	tbc_dir = proc_create("tb_core", 0666, ktch_root,
 			&perfmgr_tb_core_fops);
 	if (!tbc_dir)
 		pr_debug("tbc_dir not create\n");
 
-	tbf_dir = proc_create("tb_freq", 0644, ktch_root,
+	tbf_dir = proc_create("tb_freq", 0666, ktch_root,
 			&perfmgr_tb_freq_fops);
 	if (!tbf_dir)
 		pr_debug("tbf_dir not create\n");
-	tbclstr_dir = proc_create("tb_clstr", 0644, ktch_root,
+	tbclstr_dir = proc_create("tb_clstr", 0666, ktch_root,
 			&perfmgr_tb_clstr_fops);
 	if (!tbclstr_dir)
 		pr_debug("tbclstr_dir not create\n");

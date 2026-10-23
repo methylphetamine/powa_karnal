@@ -22,6 +22,8 @@
 #include <linux/types.h>
 #include "inc/cam_qos.h"
 
+extern int camera_4k60_get(void);
+
 #ifdef CONFIG_MTK_QOS_SUPPORT
 #include <mmdvfs_pmqos.h>
 #include <smi_port.h>
@@ -559,7 +561,9 @@ int ISP_SetPMQOS(
 		break;
 	case E_CLK_ADD:
 		mtk_dfs_add();
-		LOG_DBG("DFS_add\n");
+		target_clk = 560;
+		mtk_dfs_update(target_clk);
+		LOG_DBG("DFS_add: primed to peak 560MHz\n");
 		break;
 	case E_CLK_REMOVE:
 		mtk_dfs_remove();
@@ -573,7 +577,7 @@ int ISP_SetPMQOS(
 		mtk_dfs_set();
 		target_clk = *(u32 *)pvalue;
 		mtk_dfs_update(target_clk);
-		LOG_DBG("DFS Set clock :%d", *pvalue);
+		LOG_DBG("DFS Set clock :%d\n", *pvalue);
 		break;
 	case E_CLK_SUPPORTED:
 		{

@@ -57,6 +57,7 @@
 #include <linux/swapops.h>
 #include <linux/balloon_compaction.h>
 #include <linux/rtmm.h>
+#include <linux/xswapd.h>
 
 #include "internal.h"
 
@@ -156,9 +157,11 @@ struct scan_control {
 #endif
 
 /*
- * From 0 .. 100.  Higher means more swappy.
+ * iOS-style in-memory compression: default swappiness to 100 so
+ * anonymous pages are compressed into ZRAM on-demand rather than
+ * starving file cache and evicting active app code.
  */
-int vm_swappiness = 80;
+int vm_swappiness = 100;
 /*
  * The total number of pages which are beyond the high watermark within all
  * zones.
@@ -2402,9 +2405,13 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * Without the second condition we could end up never scanning an
 	 * lruvec even if it has plenty of old anonymous pages unless the
 	 * system is under heavy pressure.
+	 *
+	 * When swappiness >= 100 (in-memory compressed ZRAM), bypass this
+	 * check so idle anonymous memory is compressed into ZRAM rather
+	 * than evicting valuable file caches and causing major refaults.
 	 */
 	if (!inactive_list_is_low(lruvec, true, sc, false) &&
-	    lruvec_lru_size(lruvec, LRU_INACTIVE_FILE, sc->reclaim_idx) >> sc->priority && (swappiness != 200)) {
+	    lruvec_lru_size(lruvec, LRU_INACTIVE_FILE, sc->reclaim_idx) >> sc->priority && (swappiness < 100)) {
 		scan_balance = SCAN_FILE;
 		goto out;
 	}
@@ -2754,6 +2761,9 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 	struct reclaim_state *reclaim_state = current->reclaim_state;
 	unsigned long nr_reclaimed, nr_scanned;
 	bool reclaimable = false;
+
+	if (!current_is_kswapd() && sc->priority < DEF_PRIORITY - 2)
+		xswapd_wakeup();
 
 	do {
 		struct mem_cgroup *root = sc->target_mem_cgroup;

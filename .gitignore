@@ -125,7 +125,27 @@ all.config
 kernel/configs/android-*.cfg
 
 out/
+build/
 *.zip
 Anykernel/
 /anykernel/
 clang*
+/kerdevdep/clang/
+/kerdevdep/gcc/
+/kerdevdep/usr/
+/kerdevdep/lib/
+/kerdevdep/etc/
+/kerdevdep/anykernel/
+/kerdevdep/bin/
+/kerdevdep/*.tar.gz
+/kerdevdep/*.zip
+scratch/
+reboot_logs/
+reboot-logs/
+*reboot*.log
+*reboot_log*
+*.perfetto-trace
+!.github/
+!.agents/
+pox-manager/
+*.apk
