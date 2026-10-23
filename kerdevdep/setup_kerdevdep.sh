@@ -7,33 +7,56 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-CLANG_VER="clang-r383902"
-GCC_VER="android-11.0.0_r1"
-CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/${GCC_VER}/${CLANG_VER}.tar.gz"
-GCC_URL="https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/${GCC_VER}.tar.gz"
-AK3_URL="https://github.com/osm0sis/AnyKernel3/archive/refs/heads/master.zip"
+# --- Compiler selection ---------------------------------------------------
+# TheRagingBeast (TRB) Clang 18.0.0, the same toolchain the onyx-kaeru branch
+# builds with. It is self-contained: LLVM/Clang 18 + lld + bundled aarch64/arm
+# binutils, so no separate GCC prebuilt is downloaded.
+#
+# The compiler that ships a released kernel is third-party code, so it is
+# checked out at an exact revision instead of a mutable branch. To update:
+#   git ls-remote "$TRB_CLANG_REPO" "$TRB_CLANG_REF"
+TRB_CLANG_VER="${TRB_CLANG_VER:-TheRagingBeast TRB Clang 18.0.0 (17092023)}"
+TRB_CLANG_REPO="${TRB_CLANG_REPO:-https://gitlab.com/voltageos/clang.git}"
+TRB_CLANG_REF="${TRB_CLANG_REF:-test}"
+TRB_CLANG_PIN="${TRB_CLANG_PIN:-b0fa406b3f65eae210c60dda2e91dae979e4b3a8}"
+AK3_URL="${AK3_URL:-https://github.com/osm0sis/AnyKernel3/archive/refs/heads/master.zip}"
 
 log() { printf '\033[1;34m[kerdevdep] %s\033[0m\n' "$*"; }
 
-mkdir -p bin clang gcc anykernel usr/share/bison lib
+mkdir -p bin clang anykernel usr/share/bison lib
 
-# 1. Download Clang if missing
+# 1. Download TRB Clang if missing, pinned to an exact revision
 if [[ ! -x "clang/bin/clang" ]]; then
-    log "Downloading Android Clang (${CLANG_VER}) ..."
-    curl -L --fail --retry 3 -o clang.tar.gz "$CLANG_URL"
-    tar -xzf clang.tar.gz -C clang
-    rm -f clang.tar.gz
+    log "Downloading ${TRB_CLANG_VER} (pinned ${TRB_CLANG_PIN:0:12}) ..."
+    if ! command -v git >/dev/null 2>&1; then
+        echo "[-] git is required to fetch ${TRB_CLANG_VER}" >&2
+        exit 1
+    fi
+    rm -rf clang
+    git clone --filter=blob:none --no-checkout "$TRB_CLANG_REPO" clang
+    if ! git -C clang checkout --detach "$TRB_CLANG_PIN"; then
+        echo "[-] Pinned toolchain ${TRB_CLANG_PIN} is not reachable from ${TRB_CLANG_REPO}" >&2
+        echo "    The upstream branch was likely rewritten. Re-resolve the pin with:" >&2
+        echo "    git ls-remote ${TRB_CLANG_REPO} ${TRB_CLANG_REF}" >&2
+        exit 1
+    fi
+    actual="$(git -C clang rev-parse HEAD)"
+    if [[ "$actual" != "$TRB_CLANG_PIN" ]]; then
+        echo "[-] Toolchain pin mismatch (expected ${TRB_CLANG_PIN}, got ${actual})" >&2
+        exit 1
+    fi
+    log "Toolchain verified at ${actual}"
+    rm -rf clang/.git
+    if [[ ! -x "clang/bin/clang" ]]; then
+        echo "[-] Toolchain bootstrap failed: clang/bin/clang is missing" >&2
+        exit 1
+    fi
+    # Record which toolchain was fetched, so build.sh can detect a selection
+    # change and re-fetch instead of reusing a stale compiler.
+    printf 'trb:%s:%s\n' "$TRB_CLANG_REPO" "$TRB_CLANG_PIN" > clang/.kerdevdep-toolchain
 fi
 
-# 2. Download GCC binutils if missing
-if [[ ! -x "gcc/bin/aarch64-linux-android-ld" ]]; then
-    log "Downloading GCC 4.9 binutils (${GCC_VER}) ..."
-    curl -L --fail --retry 3 -o gcc.tar.gz "$GCC_URL"
-    tar -xzf gcc.tar.gz -C gcc
-    rm -f gcc.tar.gz
-fi
-
-# 3. Download AnyKernel3 template if missing
+# 2. Download AnyKernel3 template if missing
 if [[ ! -f "anykernel/anykernel.sh" ]]; then
     log "Downloading AnyKernel3 template ..."
     curl -L --fail --retry 3 -o ak3.zip "$AK3_URL"
@@ -145,14 +168,6 @@ for f in clang/bin/*; do
     name="$(basename "$f")"
     if [[ ! -e "bin/$name" ]]; then
         ln -sf "../clang/bin/$name" "bin/$name"
-    fi
-done
-
-# Symlink gcc binutils
-for f in gcc/bin/*; do
-    name="$(basename "$f")"
-    if [[ ! -e "bin/$name" ]]; then
-        ln -sf "../gcc/bin/$name" "bin/$name"
     fi
 done
 

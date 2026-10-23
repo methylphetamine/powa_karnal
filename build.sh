@@ -105,7 +105,31 @@ log()  { printf '\033[1;32m[*] %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31m[-] %s\033[0m\n' "$*"; }
 
+# Report the toolchain that is actually in kerdevdep (brand + LLVM version)
+toolchain_version() {
+    local cv bv
+    cv="$("$KERDEVDEP/clang/bin/clang" --version 2>/dev/null | head -n1 \
+        | sed -E 's/[[:space:]]*\([^)]*\)//g; s/[[:space:]]+/ /g; s/^[[:space:]]+//; s/[[:space:]]+$//' || true)"
+    [[ -n "$cv" ]] || cv="unknown clang"
+    bv="$("$KERDEVDEP/clang/bin/aarch64-linux-gnu-ld" --version 2>/dev/null | head -n1 \
+        | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1 || true)"
+    if [[ -n "$bv" ]]; then
+        printf '%s + binutils %s' "$cv" "$bv"
+    else
+        printf '%s' "$cv"
+    fi
+}
+
 # 1. Ensure kerdevdep is bootstrapped
+# A toolchain selection change (e.g. same kerdevdep, different Clang) forces
+# a fresh fetch so the build never silently reuses the previous compiler.
+TOOLCHAIN_SELECTOR="trb:${TRB_CLANG_REPO:-https://gitlab.com/voltageos/clang.git}:${TRB_CLANG_PIN:-b0fa406b3f65eae210c60dda2e91dae979e4b3a8}"
+
+if [[ -d "$KERDEVDEP/clang" ]] && [[ "$(cat "$KERDEVDEP/clang/.kerdevdep-toolchain" 2>/dev/null)" != "$TOOLCHAIN_SELECTOR" ]]; then
+    log "Toolchain selection changed - re-fetching Clang ..."
+    rm -rf "$KERDEVDEP/clang"
+fi
+
 if [[ ! -f "$KERDEVDEP/env.sh" || ! -x "$KERDEVDEP/clang/bin/clang" || ! -x "$KERDEVDEP/bin/ccache" ]]; then
     log "Bootstrapping self-contained dependencies in $KERDEVDEP ..."
     bash "$KERDEVDEP/setup_kerdevdep.sh"
@@ -114,11 +138,12 @@ fi
 # 2. Source kerdevdep environment
 # shellcheck source=/dev/null
 source "$KERDEVDEP/env.sh"
+TOOLCHAIN_VER="$(toolchain_version)"
 
 ARCH=arm64
 CC=clang
 CLANG_TRIPLE=aarch64-linux-gnu-
-CROSS_COMPILE=aarch64-linux-android-
+CROSS_COMPILE=aarch64-linux-gnu-
 AK3_DIR="$KERDEVDEP/anykernel"
 
 export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-TXO_R}"
@@ -301,14 +326,14 @@ package_zip() {
     commit_subject="$(git log -1 --format=%s 2>/dev/null || echo "Release build")"
     git_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "gaming")"
     kver="4.14.$(grep -m1 '^SUBLEVEL =' "$ROOT_DIR/Makefile" | awk '{print $3}')"
-    toolchain_ver="Clang 11.0.1 + GCC 9.3"
+    toolchain_ver="$TOOLCHAIN_VER"
 
     local kernel_name_upper version_name_upper
     kernel_name_upper="$(echo "$KERNEL_NAME" | tr '[:lower:]' '[:upper:]')"
     version_name_upper="$(echo "$VERSION_NAME" | tr '[:lower:]' '[:upper:]')"
     local full_title="${KERNEL_NAME} Kernel ${KERNEL_VERSION} [${VERSION_NAME}]"
     local kver="4.14.$(grep -m1 '^SUBLEVEL =' "$ROOT_DIR/Makefile" | awk '{print $3}')"
-    local toolchain_ver="Clang 11.0.1 + GCC 9.3"
+    local toolchain_ver="$TOOLCHAIN_VER"
 
     # Generate dynamic changelog ui_print statements for TWRP
     local changelog_ui=""

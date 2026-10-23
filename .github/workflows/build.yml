@@ -34,8 +34,8 @@ jobs:
       KERNEL_NAME: MeTh-Kernel-begonia
       TC_ROOT: ${{ github.workspace }}/toolchains
       OUT_DIR: out
-      CLANG_VER: clang-r383902
-      GCC_VER: android-11.0.0_r1
+      # TheRagingBeast (TRB) Clang 18.0.0, pinned by kerdevdep/setup_kerdevdep.sh
+      TRB_CLANG_VER: TheRagingBeast TRB Clang 18.0.0 (17092023)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,8 +58,10 @@ jobs:
         id: toolchain-cache
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/toolchains
-          key: toolchains-${{ env.CLANG_VER }}-${{ env.GCC_VER }}
+          path: |
+            kerdevdep/clang
+            kerdevdep/anykernel
+          key: kerdevdep-trb-clang-v1
 
       - name: Build kernel
         run: |
