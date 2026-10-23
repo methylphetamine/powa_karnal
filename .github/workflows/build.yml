@@ -1,0 +1,149 @@
+name: Build Kernel
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  # Releases are OPT-IN. A normal push/PR build only uploads workflow artifacts.
+  # The flashable zip is published as a release asset only when you either:
+  #   * push a v* tag, or
+  #   * run this workflow manually with the "release" input enabled.
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish the flashable zip as a "latest" release asset'
+        type: boolean
+        default: false
+
+# Required so the workflow can create/update the GitHub Release that carries the
+# flashable zip as a directly-downloadable asset (no wrapper zip).
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build begonia kernel
+    runs-on: ubuntu-latest
+    env:
+      KERNEL_NAME: MeTh-Kernel-begonia
+      TC_ROOT: ${{ github.workspace }}/toolchains
+      OUT_DIR: out
+      CLANG_VER: clang-r383902
+      GCC_VER: android-11.0.0_r1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential ccache zip unzip cpio python3 flex bison \
+            libssl-dev bc dwarves zstd libelf-dev
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: begonia-${{ github.sha }}
+
+      - name: Setup cache for toolchains
+        id: toolchain-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/toolchains
+          key: toolchains-${{ env.CLANG_VER }}-${{ env.GCC_VER }}
+
+      - name: Build kernel
+        run: |
+          export TC_ROOT="${{ github.workspace }}/toolchains"
+          export CCACHE_DIR="${{ runner.temp }}/ccache"
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Verify APatch kallsyms requirements
+        run: |
+          if ! grep -q '^CONFIG_KALLSYMS_ALL=y$' "$OUT_DIR/.config"; then
+            echo "::error::CONFIG_KALLSYMS_ALL is not set to y in $OUT_DIR/.config - APatch/KernelPatch requires it"
+            exit 1
+          fi
+          echo "CONFIG_KALLSYMS_ALL=y confirmed"
+          grep -E '^#? ?CONFIG_KALLSYMS' "$OUT_DIR/.config" || true
+
+      # NOTE: GitHub always wraps artifact downloads in a .zip, which means the
+      # flashable zip arrives nested inside another zip. The release asset step
+      # below publishes the same zip so it downloads as-is and can be flashed
+      # straight away.
+      - name: Upload flashable zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeTh-Kernel-begonia-flashable
+          path: MeTh-Kernel-begonia-*.zip
+          if-no-files-found: error
+
+      - name: Upload Image.gz-dtb
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image.gz-dtb
+          path: out/arch/arm64/boot/Image.gz-dtb
+          if-no-files-found: error
+
+      - name: Resolve flashable zip path
+        id: zip
+        run: |
+          shopt -s nullglob
+          zips=(MeTh-Kernel-begonia-*.zip)
+          if (( ${#zips[@]} == 0 )); then
+            echo "::error::No MeTh-Kernel-begonia-*.zip was produced"
+            exit 1
+          fi
+          echo "name=${zips[0]}" >> "$GITHUB_OUTPUT"
+          echo "Flashable zip: ${zips[0]}"
+
+      # Release assets download directly (no wrapper zip).
+      # Runs ONLY for a v* tag push or a manual dispatch with release=true, so
+      # nothing is published until the build has been verified on device.
+      #  - tag push (v*)  -> release named after the tag, versioned asset name
+      #  - manual release -> rolling "latest" release with a stable asset name,
+      #                      so this URL always serves the newest build:
+      #                      .../releases/latest/download/MeTh-Kernel-begonia.zip
+      - name: Publish flashable zip as release asset
+        if: >-
+          github.event_name != 'pull_request' &&
+          (startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZIP_NAME: ${{ steps.zip.outputs.name }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF_NAME}"
+            asset="$ZIP_NAME"
+            notes="MeTh-Kernel-begonia for Redmi Note 8 Pro (begonia) - ${GITHUB_REF_NAME}"
+          else
+            tag="latest"
+            asset="MeTh-Kernel-begonia.zip"
+            notes="MeTh-Kernel-begonia for Redmi Note 8 Pro (begonia) - rolling build from ${GITHUB_SHA::12}"
+          fi
+
+          if [[ "$asset" != "$ZIP_NAME" ]]; then
+            cp -f "$ZIP_NAME" "$asset"
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$asset" --clobber
+            gh release edit "$tag" --notes "$notes"
+          else
+            gh release create "$tag" "$asset" \
+              --title "$tag" \
+              --notes "$notes"
+          fi
+
+          echo "Release asset: $(gh release view "$tag" --json url --jq .url)"

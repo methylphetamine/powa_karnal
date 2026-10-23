@@ -50,6 +50,7 @@ static DEFINE_IDA(binderfs_minors);
 
 enum {
 	Opt_max,
+	Opt_extended_error,
 	Opt_stats_mode,
 	Opt_err
 };
@@ -61,6 +62,7 @@ enum binderfs_stats_mode {
 
 static const match_table_t tokens = {
 	{ Opt_max, "max=%d" },
+	{ Opt_extended_error, "extended_error" },
 	{ Opt_stats_mode, "stats=%s" },
 	{ Opt_err, NULL     }
 };
@@ -69,6 +71,15 @@ static inline struct binderfs_info *BINDERFS_I(const struct inode *inode)
 {
 	return inode->i_sb->s_fs_info;
 }
+static struct binder_features {
+	bool oneway_spam_detection;
+	bool extended_error;
+} binder_features = {
+	.oneway_spam_detection = true,
+	.extended_error = true,
+};
+
+
 
 bool is_binderfs_device(const struct inode *inode)
 {

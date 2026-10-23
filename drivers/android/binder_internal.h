@@ -3,6 +3,9 @@
 #ifndef _LINUX_BINDER_INTERNAL_H
 #define _LINUX_BINDER_INTERNAL_H
 
+/* For descriptor bitmap */
+#include "dbitmap.h"
+
 #include <linux/export.h>
 #include <linux/fs.h>
 #include <linux/list.h>
@@ -15,6 +18,8 @@
 
 #ifdef CONFIG_MTK_ENG_BUILD
 #define BINDER_WATCHDOG		"v0.1"
+
+#define HAVE_DMAP 1
 #endif
 #define BINDER_USER_TRACKING	1
 
@@ -218,3 +223,6 @@ struct binder_transaction_log {
 extern struct binder_transaction_log binder_transaction_log;
 extern struct binder_transaction_log binder_transaction_log_failed;
 #endif /* _LINUX_BINDER_INTERNAL_H */
+
+
+/* Note: binder_proc.dmap (struct dbitmap) should be added for fast descriptor lookup */
