@@ -1310,13 +1310,20 @@ if [ -n "\$ROOT_SRC" ]; then
     ROOT_INSTALL=/dev/tmp/install;
     rm -rf "\$ROOT_INSTALL";
     mkdir -p "\$ROOT_INSTALL";
-    ROOT_BB=/dev/tmp/pox_busybox;
+    # BusyBox picks its applet from argv[0]. The extracted binary must be named
+    # "busybox" (as in the APK's own update-binary); a name like "pox_busybox"
+    # makes it fail with "applet not found" and the installer never runs.
+    ROOT_BB=/dev/tmp/busybox;
     if unzip -o "\$ROOT_SRC" "lib/arm64-v8a/libbusybox.so" -d /dev/tmp >/dev/null 2>&1; then
         mv -f /dev/tmp/lib/arm64-v8a/libbusybox.so "\$ROOT_BB" 2>/dev/null;
         chmod 755 "\$ROOT_BB" 2>/dev/null;
         rm -rf /dev/tmp/lib;
     fi;
-    unzip -o "\$ROOT_SRC" "assets/*" "lib/*" -x "lib/*/libbusybox.so" -d "\$ROOT_INSTALL" >/dev/null 2>&1;
+    if [ -x "\$ROOT_BB" ]; then
+        "\$ROOT_BB" unzip -o "\$ROOT_SRC" "assets/*" "lib/*" -x "lib/*/libbusybox.so" -d "\$ROOT_INSTALL" >/dev/null 2>&1;
+    else
+        unzip -o "\$ROOT_SRC" "assets/*" "lib/*" -x "lib/*/libbusybox.so" -d "\$ROOT_INSTALL" >/dev/null 2>&1;
+    fi;
     if [ -f "\$ROOT_INSTALL/assets/InstallAP.sh" ]; then
         chmod -R 755 "\$ROOT_INSTALL/assets" "\$ROOT_INSTALL/lib" 2>/dev/null;
         if [ -x "\$ROOT_BB" ]; then
@@ -1324,7 +1331,11 @@ if [ -n "\$ROOT_SRC" ]; then
         else
             ( cd "\$ROOT_INSTALL" && sh assets/InstallAP.sh 3 "\$OUTFD" "\$ROOT_SRC" );
         fi;
-        ui_print " [*] ${ROOT_LABEL:-root package} install step complete.";
+        if [ -f "\$ROOT_INSTALL/new-boot.img" ]; then
+            ui_print " [*] ${ROOT_LABEL:-root package} patched the boot image.";
+        else
+            ui_print " [!] ${ROOT_LABEL:-root package} did not produce a patched boot image.";
+        fi;
     else
         ui_print " [!] ${ROOT_LABEL:-root package} installer not found; skipping root step.";
     fi;
