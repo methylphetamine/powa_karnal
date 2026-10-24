@@ -284,7 +284,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="latest-${VERSION_NAME}"
+            # One release per build (commit), so variants/commits never bundle
+            # multiple zips onto a single "latest-*" tag.
+            TAG="${VERSION_NAME}-${COMMIT_HASH}"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
