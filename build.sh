@@ -12,6 +12,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT_DIR/build}"
 OUT_DIR="${OUT_DIR:-$BUILD_DIR/out}"
 KERDEVDEP="${KERDEVDEP:-$ROOT_DIR/kerdevdep}"
+PATCH_DIR="${PATCH_DIR:-$ROOT_DIR/patches}"
+ACTION="${1:-all}"
 
 # Kernel Branding & Versioning (Fully customizable via environment or build script)
 KERNEL_NAME="${KERNEL_NAME:-Pox}"
@@ -63,12 +65,30 @@ log()  { printf '\033[1;32m[*] %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31m[-] %s\033[0m\n' "$*"; }
 
+# Read-only variant listing. This runs before any patch application or
+# toolchain bootstrap so `./build.sh patches` can inspect the tree safely.
+if [[ "$ACTION" == "variants" || "$ACTION" == "list-variants" ||
+      "$ACTION" == "patches" || "$ACTION" == "list-patches" ]]; then
+    log "Variant selection: VARIANT=<root>[,<overlay>] (e.g. VARIANT=ksu,c2)"
+    log "Root flavors: vanilla (none), apatch, folkpatch, ksu"
+    log "Overlays:     miui, c2"
+    echo
+    for patch in "$PATCH_DIR"/*.patch; do
+        [[ -f "$patch" ]] || continue
+        printf '  %-8s %8s bytes  %s\n' \
+            "$(basename "$patch" .patch)" \
+            "$(stat -c%s "$patch" 2>/dev/null || wc -c < "$patch")" \
+            "$(grep -c '^diff --git' "$patch") file(s)"
+    done
+    exit 0
+fi
+
 # ---------------------------------------------------------------------------
 # Variant selection
 # ---------------------------------------------------------------------------
 # The repository keeps one source branch (`onyx`). Root flavors (vanilla,
 # APatch, FolkPatch, KernelSU/ReSukiSU) and media overlays (MIUI/HyperOS,
-# Codec2) are shipped as patch sets under variants/ and applied on top of that
+# Codec2) are shipped as patch sets under patches/ and applied on top of that
 # branch at build time.
 #
 #   VARIANT=vanilla          stock build, no patches
@@ -139,15 +159,38 @@ apply_variant_patches() {
     done
     requested=("${roots[@]}" "${overlays[@]}")
 
+    # A tree left dirty by an earlier variant build must never be reused for
+    # a different variant (for example `VARIANT=ksu ./build.sh all` followed
+    # by `VARIANT=vanilla ./build.sh all` would silently ship a rooted
+    # kernel). Detect applied patch sets that are not part of this request.
+    local applied=() f n wanted
+    for f in "$PATCH_DIR"/*.patch; do
+        [[ -f "$f" ]] || continue
+        if git apply --reverse --check "$f" >/dev/null 2>&1; then
+            applied+=("$(basename "$f" .patch)")
+        fi
+    done
+    for name in "${applied[@]}"; do
+        wanted=0
+        for n in "${requested[@]}"; do
+            [[ "$n" == "$name" ]] && wanted=1
+        done
+        if (( ! wanted )); then
+            err "Patch set '$name' is still applied from a previous build."
+            err "Run './build.sh unvariant' to restore the clean onyx tree, then retry."
+            exit 1
+        fi
+    done
+
     ((${#requested[@]})) || return 0
 
     # Validate every requested patch before touching the tree.
     local patch
     for name in "${requested[@]}"; do
-        patch="$ROOT_DIR/variants/$name.patch"
+        patch="$PATCH_DIR/$name.patch"
         if [[ ! -f "$patch" ]]; then
-            err "Variant '$name' has no patch file (expected variants/$name.patch)"
-            err "Available variants: $(ls "$ROOT_DIR/variants"/*.patch 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/\.patch$//' | paste -sd' ' -)"
+            err "Variant '$name' has no patch file (expected patches/$name.patch)"
+            err "Available variants: $(ls "$PATCH_DIR"/*.patch 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/\.patch$//' | paste -sd' ' -)"
             exit 1
         fi
     done
@@ -156,7 +199,7 @@ apply_variant_patches() {
     # `./build.sh zip` runs do not fail).
     local pending=0
     for name in "${requested[@]}"; do
-        patch="$ROOT_DIR/variants/$name.patch"
+        patch="$PATCH_DIR/$name.patch"
         if ! git apply --reverse --check "$patch" >/dev/null 2>&1; then
             pending=1
         fi
@@ -173,7 +216,7 @@ apply_variant_patches() {
         for name in "${requested[@]}"; do
             while IFS= read -r p; do
                 touched+=("$p")
-            done < <(grep '^diff --git' "$ROOT_DIR/variants/$name.patch" \
+            done < <(grep '^diff --git' "$PATCH_DIR/$name.patch" \
                 | sed -E 's|^diff --git a/||; s| b/.*$||')
         done
         if ! git diff --quiet -- "${touched[@]}" || ! git diff --cached --quiet -- "${touched[@]}"; then
@@ -184,15 +227,15 @@ apply_variant_patches() {
             exit 1
         fi
         for name in "${requested[@]}"; do
-            patch="$ROOT_DIR/variants/$name.patch"
+            patch="$PATCH_DIR/$name.patch"
             if git apply --reverse --check "$patch" >/dev/null 2>&1; then
                 log "Variant patch already applied: $name"
                 APPLIED_PATCHES="${APPLIED_PATCHES:+$APPLIED_PATCHES }$name"
                 continue
             fi
-            log "Applying variant patch: variants/$name.patch"
+            log "Applying variant patch: patches/$name.patch"
             git apply --index "$patch" || {
-                err "Failed to apply variants/$name.patch - rebase it onto the current tree."
+                err "Failed to apply patches/$name.patch - rebase it onto the current tree."
                 exit 1
             }
             APPLIED_PATCHES="${APPLIED_PATCHES:+$APPLIED_PATCHES }$name"
@@ -211,6 +254,46 @@ apply_variant_patches() {
     VARIANT_PATCHED=1
     export APPLIED_PATCHES VARIANT_PATCHED
 }
+
+# Restore the clean onyx tree: reverse every applied patch set (overlays were
+# applied last), then drop the KernelSU checkout added by the ksu patch.
+unapply_variant_patches() {
+    local patches=() f i
+    for f in "$PATCH_DIR"/*.patch; do
+        [[ -f "$f" ]] || continue
+        if git apply --reverse --check "$f" >/dev/null 2>&1; then
+            patches+=("$f")
+        fi
+    done
+
+    if ((${#patches[@]} == 0)); then
+        log "No variant patches are applied."
+        return 0
+    fi
+
+    # deinit first: reversing the ksu patch deletes .gitmodules.
+    if [[ -f "$ROOT_DIR/.gitmodules" ]]; then
+        git submodule deinit -f --all >/dev/null 2>&1 || true
+    fi
+
+    for ((i=${#patches[@]}-1; i>=0; i--)); do
+        log "Reverting variant patch: ${patches[i]#$ROOT_DIR/}"
+        git apply --reverse --index "${patches[i]}" || {
+            err "Could not revert ${patches[i]#$ROOT_DIR/} cleanly."
+            exit 1
+        }
+    done
+
+    rm -rf "$ROOT_DIR/KernelSU" "$ROOT_DIR/.git/modules/KernelSU"
+    log "Working tree restored to the clean onyx state."
+}
+
+# `./build.sh unvariant` is a maintenance action: it only touches the working
+# tree, so run it before the toolchain bootstrap.
+if [[ "$ACTION" == "unvariant" || "$ACTION" == "unpatch" ]]; then
+    unapply_variant_patches
+    exit 0
+fi
 
 # KernelSU is kept as a pristine upstream submodule; local fixes live in
 # ksu-patches/<root>/ and are applied on top of the checkout. Paths inside
@@ -306,8 +389,13 @@ fi
 
 # Apply the selected variant before resolving the defconfig: the patch is what
 # adds root-specific defconfigs (begonia_apatch_defconfig, reksun_defconfig).
-apply_variant_patches
-apply_root_patches
+case "$ACTION" in
+    clean|distclean) ;;
+    *)
+        apply_variant_patches
+        apply_root_patches
+        ;;
+esac
 : "${APPLIED_PATCHES:=none}"
 export APPLIED_PATCHES
 log "Variant:      $VARIANT (root: $ROOT_FLAVOR, patches: $APPLIED_PATCHES)"
@@ -383,8 +471,6 @@ AK3_DIR="$KERDEVDEP/anykernel"
 
 export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-TXO_R}"
 export KBUILD_BUILD_HOST="${KBUILD_BUILD_HOST:-${KERNEL_NAME}Kernel}"
-
-ACTION="${1:-all}"
 
 clean_build() {
     log "Cleaning build outputs in $OUT_DIR ..."
@@ -1379,18 +1465,11 @@ install_device() {
 }
 
 case "$ACTION" in
-    variants|list-variants)
-        log "Variant selection: VARIANT=<root>[,<overlay>] (e.g. VARIANT=ksu,c2)"
-        log "Root flavors: vanilla (none), apatch, folkpatch, ksu"
-        log "Overlays:     miui, c2"
-        echo
-        for patch in "$ROOT_DIR"/variants/*.patch; do
-            [[ -f "$patch" ]] || continue
-            printf '  %-8s %8s bytes  %s\n' \
-                "$(basename "$patch" .patch)" \
-                "$(stat -c%s "$patch" 2>/dev/null || wc -c < "$patch")" \
-                "$(grep -c '^diff --git' "$patch") file(s)"
-        done
+    variants|list-variants|patches|list-patches)
+        # Handled before patch application at the top of the script.
+        ;;
+    unvariant|unpatch)
+        unapply_variant_patches
         ;;
     clean)
         clean_build
@@ -1421,8 +1500,10 @@ case "$ACTION" in
         ;;
     *)
         err "Unknown action: $ACTION"
-        echo "Usage: $0 [all|kernel|zip|install|build-install|menuconfig|variants|clean|distclean]"
-        echo "       VARIANT=ksun,c2 $0 all   # root flavor + media overlay"
+        echo "Usage: $0 [all|kernel|zip|install|build-install|menuconfig|patches|unvariant|clean|distclean]"
+        echo "       VARIANT=ksu,c2 $0 all    # root flavor + media overlay"
+        echo "       $0 patches               # list available patch sets"
+        echo "       $0 unvariant             # restore the clean onyx tree"
         exit 1
         ;;
 esac

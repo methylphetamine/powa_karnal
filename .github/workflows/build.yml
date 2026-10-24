@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       root:
-        description: 'Root flavor (patches in variants/)'
+        description: 'Root flavor (patches in patches/)'
         required: true
         default: vanilla
         type: choice

@@ -1,4 +1,4 @@
-# Variants
+# Patch Sets (`patches/`)
 
 `onyx` is the single source branch. Root flavors and media overlays are patch
 sets applied **at build time** — no per-variant branches, no merge conflicts
@@ -34,16 +34,25 @@ exclusive.
 Local:
 
 ```bash
-./build.sh variants                     # list patch sets
+./build.sh patches                     # list patch sets
 VARIANT=vanilla ./build.sh all
 VARIANT=apatch ./build.sh all
 VARIANT=folkpatch,miui ./build.sh all
 VARIANT=ksu,c2 ./build.sh all
+./build.sh unvariant                  # restore the clean onyx tree
 ```
+
+`build.sh` refuses to build if a patch set from an earlier run is still
+applied but was not requested (for example `ksu` followed by `vanilla`), and
+`unvariant` reverses the applied sets (overlays first) so the tree can be
+reused safely.
 
 GitHub Actions: **Build & Release → Run workflow**, pick a root and at most one
 overlay. `VARIANT` also falls back to the branch/tag name, so `onyx-ksu-next`
-still builds the KSU edition.
+still builds the KSU edition. Successful builds are mirrored to Gofile and
+posted to Telegram as one message (zip + Gofile link + commit + changelog +
+Actions run URL) when the `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` secrets are
+configured.
 
 ## Patch sets
 
@@ -64,7 +73,7 @@ still builds the KSU edition.
    ```bash
    git diff --no-color onyx..my-variant -- \
      arch/arm64/configs drivers fs include kernel lib mm net security scripts \
-     .gitmodules KernelSU ksu-patches > variants/<name>.patch
+     .gitmodules KernelSU ksu-patches > patches/<name>.patch
    ```
 
    For a root that adds a submodule, keep the `KernelSU` gitlink and
@@ -76,8 +85,8 @@ still builds the KSU edition.
 3. Verify it applies to a clean tree:
 
    ```bash
-   git apply --check variants/<name>.patch
-   VARIANT=<name> ./build.sh variants
+   git apply --check patches/<name>.patch
+   VARIANT=<name> ./build.sh patches
    ```
 
 4. Commit. The next workflow run with that variant picks it up.

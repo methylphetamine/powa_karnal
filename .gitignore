@@ -151,4 +151,9 @@ pox-manager/
 *.apk
 
 # Variant patch sets are first-class sources for the single-branch build system.
-!/variants/*.patch
+# The generic kernel rule above ignores quilt `patches/` dirs; re-include our
+# top-level patch sets explicitly.
+!/patches/
+!/patches/*.patch
+# Files added by the ksu patch set must stay tracked as well.
+!/ksu-patches/**/*.patch
