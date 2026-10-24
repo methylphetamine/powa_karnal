@@ -310,7 +310,13 @@ jobs:
             NOTES+=$'\n'"- Mirror: ${GOFILE_LINK}"
           fi
 
-          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"
+          # Always publish a fresh release for this build instead of
+          # accumulating assets on a pre-existing tag. Drop any stale
+          # release/tag for this exact tag first, then create anew.
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" -R "$GITHUB_REPOSITORY" --yes >/dev/null 2>&1 || true
+            git push origin ":refs/tags/$TAG" >/dev/null 2>&1 || true
+          fi
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"
           gh release upload "$TAG" "$ZIP_PATH" build/Image.gz-dtb \
-            -R "$GITHUB_REPOSITORY" --clobber
+            -R "$GITHUB_REPOSITORY"
