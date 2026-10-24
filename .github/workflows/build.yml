@@ -1,14 +1,6 @@
 name: Build & Release
 
 on:
-  push:
-    branches: [onyx]
-    tags: ['v*']
-    # Docs and the downloads site do not affect the kernel image.
-    paths-ignore:
-      - 'site/**'
-      - '**/*.md'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
     inputs:
       root:
