@@ -162,6 +162,105 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Mirror the flashable zip to Gofile so the Telegram post (and anyone
+      # without a GitHub account) can download it without an artifact login.
+      # Guest uploads need no credentials; set GOFILE_TOKEN to file uploads
+      # under a persistent account instead of a throwaway guest folder.
+      - name: Upload flashable zip to Gofile
+        id: gofile
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=(-F "file=@${ZIP_PATH}")
+          if [[ -n "${GOFILE_TOKEN:-}" ]]; then
+            args+=(-F "token=${GOFILE_TOKEN}")
+          fi
+          response="$(curl -fsSL --retry 3 --max-time 600 "${args[@]}" https://upload.gofile.io/uploadfile)"
+          link="$(printf '%s' "$response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["downloadPage"])')"
+          [[ "$link" == https://* ]] || { echo "::error::Unexpected Gofile response: $response"; exit 1; }
+          echo "link=${link}" >> "$GITHUB_OUTPUT"
+          echo "Gofile: ${link}"
+
+      # One Telegram message per build: the zip itself plus a caption carrying
+      # the Gofile link, commit, changelog and the Actions run URL.
+      # Required secrets: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
+      # Optional secret:  TELEGRAM_MESSAGE_THREAD_ID (forum topic)
+      - name: Notify Telegram
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_MESSAGE_THREAD_ID: ${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}
+          GOFILE_LINK: ${{ steps.gofile.outputs.link }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
+            echo "::warning::TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set; skipping Telegram notification."
+            exit 0
+          fi
+
+          caption_file="$RUNNER_TEMP/telegram-caption.html"
+          export caption_file
+          python3 - <<'PY'
+          import html, os, subprocess
+
+          def esc(value):
+              return html.escape(value or "", quote=False)
+
+          changelog = subprocess.run(
+              ["git", "log", "-n", "6", "--pretty=format:• %h %s"],
+              capture_output=True, text=True).stdout
+
+          lines = [
+              f"<b>Pox Kernel {esc(os.environ.get('VERSION_NAME'))}</b>",
+              f"<b>Commit:</b> <code>{esc(os.environ.get('COMMIT_HASH'))}</code> "
+              f"{esc(os.environ.get('COMMIT_SUBJECT'))}",
+              f"<b>Variant:</b> {esc(os.environ.get('VARIANT'))} "
+              f"(root: {esc(os.environ.get('ROOT_FLAVOR'))})",
+              f"<b>Defconfig:</b> <code>{esc(os.environ.get('DEFCONFIG'))}</code>",
+          ]
+          if os.environ.get("GOFILE_LINK"):
+              lines.append(f"<b>Gofile:</b> {esc(os.environ['GOFILE_LINK'])}")
+          lines.append(f"<b>Run:</b> {esc(os.environ.get('RUN_URL'))}")
+          lines.append("")
+          lines.append("<b>Changelog</b>")
+          lines.append(esc(changelog))
+
+          caption = "\n".join(lines)
+          # Telegram caps captions at 1024 characters; stay under the limit
+          # after entity parsing and keep the important fields at the top.
+          if len(caption) > 1000:
+              caption = caption[:980].rstrip() + "\n… (truncated)"
+          with open(os.environ["caption_file"], "w", encoding="utf-8") as fh:
+              fh.write(caption)
+          PY
+
+          send_args=(-F "chat_id=${TELEGRAM_CHAT_ID}" -F "parse_mode=HTML")
+          if [[ -n "${TELEGRAM_MESSAGE_THREAD_ID:-}" ]]; then
+            send_args+=(-F "message_thread_id=${TELEGRAM_MESSAGE_THREAD_ID}")
+          fi
+
+          zip_bytes="$(stat -c%s "$ZIP_PATH")"
+          if (( zip_bytes > 50 * 1024 * 1024 )); then
+            # Bot API cannot upload documents above 50 MiB. The Gofile mirror
+            # still gives a one-tap download, so send the same caption as text.
+            echo "::warning::Zip is ${zip_bytes} bytes (>50 MiB); sending the caption without the file attachment."
+            send_args+=(-F "text=<${caption_file}" -F "disable_web_page_preview=true")
+            curl -fsS -X POST \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              "${send_args[@]}"
+          else
+            send_args+=(-F "document=@${ZIP_PATH}" -F "caption=<${caption_file}")
+            curl -fsS -X POST \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+              "${send_args[@]}"
+          fi
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release == 'true'
         env:
