@@ -808,14 +808,13 @@ static void mt6360_torch_disable_sysfs(void)
 	mt6360_disable(MT6360_CHANNEL_ALL);
 }
 
-static ssize_t torchbrightness_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t size)
+/*
+ * Exported torch knobs used by the MediaTek gaming_mode driver. Keep the
+ * clamping and enable/disable sequencing in one place so the sysfs node,
+ * gaming_mode and any other in-kernel caller behave identically.
+ */
+int pox_torch_brightness_set(int value)
 {
-	int value;
-
-	if (kstrtoint(buf, 0, &value))
-		return -EINVAL;
-
 	if (value < 0)
 		value = 0;
 	else if (value > MT6360_LEVEL_TORCH)
@@ -832,6 +831,26 @@ static ssize_t torchbrightness_store(struct device *dev,
 		mt6360_set_driver(0);
 	}
 	mt6360_torch_level_sysfs = value;
+
+	return value;
+}
+EXPORT_SYMBOL(pox_torch_brightness_set);
+
+int pox_torch_brightness_get(void)
+{
+	return mt6360_torch_level_sysfs;
+}
+EXPORT_SYMBOL(pox_torch_brightness_get);
+
+static ssize_t torchbrightness_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int value;
+
+	if (kstrtoint(buf, 0, &value))
+		return -EINVAL;
+
+	pox_torch_brightness_set(value);
 
 	return size;
 }
