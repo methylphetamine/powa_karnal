@@ -15,34 +15,26 @@ site/
 ## Local preview
 
 ```bash
-python3 site/generate_releases.py --out site/releases.json   # needs GH_TOKEN
+GITHUB_REPOSITORY=methylphetamine/powa_karnal python3 site/generate_releases.py
 python3 -m http.server -d site 8080
 # http://localhost:8080
 ```
 
 `generate_releases.py` also accepts `--input saved-api-response.json`, which is
-handy for testing the renderer without a token.
+handy for testing the renderer without hitting the API. `GH_TOKEN` is optional
+for this public repository and only raises the API rate limit.
 
 ## Deployment
 
 `.github/workflows/pages.yml` deploys the folder to GitHub Pages after every
-**Build & Release** run whose release changed, on pushes touching `site/`, and
-manually through **Actions → Deploy downloads site**.
+**Build & Release** run, on pushes touching `site/`, and manually through
+**Actions → Deploy downloads site**.
 
-One-time setup:
+The site is served from `https://methylphetamine.github.io/powa_karnal/`
+(repository **Settings → Pages → Source: GitHub Actions**).
 
-1. Repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. Run the workflow once.
-3. The site is served from `https://<owner>.github.io/<repo>/`.
+## Downloads
 
-> GitHub Pages for a **private** repository needs a plan that includes it
-> (Pro/Team/Enterprise). Without Pages the folder still works on any static
-> host (Cloudflare Pages, Netlify, nginx) — `releases.json` is the only file
-> the deploy step generates.
-
-## Downloads and private releases
-
-Release assets of a private repository require a GitHub login with access, so
-the site prefers the **Gofile mirror** that the build records in the release
-notes (`- Mirror: https://gofile.io/...`). When no mirror exists the card links
-to the GitHub release page and notes that repository access may be required.
+Release assets are public. Each card has a **Direct download** button for the
+ZIP on GitHub Releases and, when the release notes contain a Gofile link, a
+**Gofile mirror** button next to it.

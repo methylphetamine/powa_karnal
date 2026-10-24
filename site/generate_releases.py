@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Build site/releases.json from this repository's GitHub releases.
 
-The releases page is deployed by .github/workflows/pages.yml. Release assets
-of a private repository are not downloadable by anonymous visitors, so the
-public download button prefers the Gofile mirror that build.sh records in the
-release notes.
+The site is public, so each card offers the GitHub release asset as the direct
+download and the Gofile mirror recorded in the release notes as a backup.
 
 Usage:
+    GITHUB_REPOSITORY=owner/repo python3 site/generate_releases.py
     GH_TOKEN=... GITHUB_REPOSITORY=owner/repo python3 site/generate_releases.py
     python3 site/generate_releases.py --input releases-api.json --out site/releases.json
 """
@@ -31,20 +30,19 @@ MIRROR_RE = re.compile(r"https://gofile\.io/(?:d|download)/[A-Za-z0-9_-]+")
 ROOTS = ("folkpatch", "apatch", "ksu", "vanilla")
 
 
-def fetch_releases(repository: str, token: str) -> list[dict]:
+def fetch_releases(repository: str, token: str | None) -> list[dict]:
     releases: list[dict] = []
     page = 1
     while True:
         url = f"{API_ROOT}/repos/{repository}/releases?per_page=100&page={page}"
-        request = urllib.request.Request(
-            url,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {token}",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "pox-kernel-site",
-            },
-        )
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "pox-kernel-site",
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        request = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
                 chunk = json.load(response)
@@ -121,8 +119,8 @@ def main() -> int:
     else:
         token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
         repository = os.environ.get("GITHUB_REPOSITORY")
-        if not token or not repository:
-            print("GH_TOKEN/GITHUB_TOKEN and GITHUB_REPOSITORY are required", file=sys.stderr)
+        if not repository:
+            print("GITHUB_REPOSITORY is required", file=sys.stderr)
             return 2
         raw = fetch_releases(repository, token)
 

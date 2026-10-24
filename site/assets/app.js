@@ -66,12 +66,12 @@
   }
 
   function downloadTarget(release) {
-    if (release.mirror) return { url: release.mirror, label: "Download mirror", external: true };
     const asset = zipAsset(release);
     if (asset && asset.url) {
-      return { url: asset.url, label: "Download zip", external: true, auth: true };
+      return { url: asset.url, label: "Direct download", external: true };
     }
-    if (release.html_url) return { url: release.html_url, label: "Open release", external: true, auth: true };
+    if (release.mirror) return { url: release.mirror, label: "Gofile mirror", external: true };
+    if (release.html_url) return { url: release.html_url, label: "Open release", external: true };
     return null;
   }
 
@@ -132,9 +132,6 @@
     if (target) {
       download.href = target.url;
       download.textContent = target.label;
-      if (target.auth) {
-        download.title = "This build lives on GitHub; a repository account may be required.";
-      }
     } else {
       download.setAttribute("aria-disabled", "true");
       download.textContent = "Unavailable";
@@ -146,6 +143,12 @@
       notes.href = release.html_url;
     } else {
       notes.hidden = true;
+    }
+
+    const mirror = node.querySelector("[data-mirror]");
+    if (release.mirror && (!target || target.url !== release.mirror)) {
+      mirror.href = release.mirror;
+      mirror.hidden = false;
     }
 
     return node;
