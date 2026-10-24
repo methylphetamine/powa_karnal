@@ -11593,15 +11593,15 @@ index 66c1fd251..1cfbbec7d 100644
  
 diff --git a/ksu-patches/ksu/0001-add-multi-manager-signs.patch b/ksu-patches/ksu/0001-add-multi-manager-signs.patch
 new file mode 100644
-index 000000000..04073bde6
+index 000000000..9dde7127c
 --- /dev/null
 +++ b/ksu-patches/ksu/0001-add-multi-manager-signs.patch
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,122 @@
 +diff --git a/kernel/manager/apk_sign.c b/kernel/manager/apk_sign.c
-+index eba496d..8f70564 100644
++index eba496d..ae10a50 100644
 +--- a/kernel/manager/apk_sign.c
 ++++ b/kernel/manager/apk_sign.c
-+@@ -36,6 +36,25 @@ static apk_sign_key_t apk_sign_keys[] = {
++@@ -36,6 +36,26 @@ static apk_sign_key_t apk_sign_keys[] = {
 + #ifdef CONFIG_KSU_MULTI_MANAGER_SUPPORT
 +     { EXPECTED_SIZE_OFFICIAL, EXPECTED_HASH_OFFICIAL }, // tiann/KernelSU
 +     { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, // KOWX712/KernelSU
@@ -11621,6 +11621,7 @@ index 000000000..04073bde6
 ++    { EXPECTED_SIZE_AGNESSU, EXPECTED_HASH_AGNESSU }, // Yakayna/AgnesSU
 ++    { EXPECTED_SIZE_YUKISU, EXPECTED_HASH_YUKISU }, // Rouyashiki/Anatdx/YukiSU
 ++    { EXPECTED_SIZE_FINASU, EXPECTED_HASH_FINASU }, // LyraVoid/FinaSU
+++    { EXPECTED_SIZE_SAKISU, EXPECTED_HASH_SAKISU }, // XingChenRS/SakiSU (ShiroSU)
 ++    { EXPECTED_SIZE_MAKOSU, EXPECTED_HASH_MAKOSU }, // Spring-bulid/MakoSU
 ++    { EXPECTED_SIZE_XXKSU, EXPECTED_HASH_XXKSU }, // backslashxx/KernelSU
 ++    { EXPECTED_SIZE_APKESU, EXPECTED_HASH_APKESU }, // fixz232/ApkeSU (also Pseudo-SterSU)
@@ -11628,10 +11629,10 @@ index 000000000..04073bde6
 +     { EXPECTED_SIZE, EXPECTED_HASH }, // Custom
 + #endif
 +diff --git a/kernel/manager/manager_sign.h b/kernel/manager/manager_sign.h
-+index a940135..403c627 100644
++index a940135..9217059 100644
 +--- a/kernel/manager/manager_sign.h
 ++++ b/kernel/manager/manager_sign.h
-+@@ -13,6 +13,82 @@
++@@ -13,6 +13,86 @@
 + #define EXPECTED_SIZE_KOWX712 0x375
 + #define EXPECTED_HASH_KOWX712 "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"
 + 
@@ -11698,6 +11699,10 @@ index 000000000..04073bde6
 ++// LyraVoid/FinaSU
 ++#define EXPECTED_SIZE_FINASU 0x2cc
 ++#define EXPECTED_HASH_FINASU "2d89b50aaf1db013c2b6738f973f48b62ea21a3a8d7216bfec3521065d448458"
+++
+++// XingChenRS/SakiSU (ShiroSU)
+++#define EXPECTED_SIZE_SAKISU 0x310
+++#define EXPECTED_HASH_SAKISU "f5391718452b269336a4cf0077b2fc4f9ae91253f061126a2708d5017134287c"
 ++
 ++// Spring-bulid/MakoSU
 ++#define EXPECTED_SIZE_MAKOSU 0x0549
