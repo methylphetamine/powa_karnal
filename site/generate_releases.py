@@ -82,7 +82,7 @@ def normalize(raw: dict) -> dict:
             {
                 "name": asset.get("name"),
                 "size": asset.get("size") or 0,
-                "url": asset.get("browser_download_url"),
+                "url": asset.get("browser_download_url") or asset.get("url"),
             }
         )
 
@@ -105,6 +105,57 @@ def normalize(raw: dict) -> dict:
         "mirror": mirror.group(0) if mirror else None,
         "assets": assets,
     }
+
+
+def render_downloads_html(releases: list[dict], generated_at: str) -> str:
+    """Plain-HTML download index for text/basic browsers (Links2, OrangeFox)."""
+    lines = [
+        "<!DOCTYPE html>",
+        '<html lang="en">',
+        "<head>",
+        '  <meta charset="utf-8">',
+        '  <meta name="viewport" content="width=device-width, initial-scale=1">',
+        "  <title>Pox Kernel — Direct Downloads</title>",
+        '  <meta name="description" content="Direct download links for Pox Kernel builds (Redmi Note 8 Pro / begonia).">',
+        "</head>",
+        "<body>",
+        "  <h1>Pox Kernel — Direct Downloads</h1>",
+        "  <p>Redmi Note 8 Pro (begonia) · Linux 4.14 · flash the <code>.zip</code> in TWRP/OrangeFox on the boot partition.</p>",
+        f"  <p><small>Index updated {generated_at}</small></p>",
+        '  <p><a href="./">JavaScript site</a> · <a href="https://github.com/methylamphetamine/powa_karnal/releases">GitHub releases</a></p>',
+    ]
+    if not releases:
+        lines.append("  <p>No releases published yet.</p>")
+    for rel in releases:
+        name = rel.get("name") or rel.get("title") or rel.get("tag")
+        lines.append(f"  <h2>{name}</h2>")
+        lines.append("  <ul>")
+        zip_asset = None
+        for a in rel.get("assets") or []:
+            if (a.get("name") or "").lower().endswith(".zip"):
+                zip_asset = a
+                break
+        if zip_asset and zip_asset.get("url"):
+            lines.append(f'    <li><a href="{zip_asset["url"]}">{zip_asset["name"]}</a> ({zip_asset.get("size", 0) // 1024 // 1024} MiB)</li>')
+        if rel.get("mirror"):
+            lines.append(f'    <li><a href="{rel["mirror"]}">Gofile mirror</a></li>')
+        if rel.get("html_url"):
+            lines.append(f'    <li><a href="{rel["html_url"]}">Release notes</a></li>')
+        if rel.get("sha256"):
+            lines.append(f"    <li>SHA-256: <code>{rel['sha256']}</code></li>")
+        if rel.get("kernel"):
+            lines.append(f"    <li>Kernel: {rel['kernel']}</li>")
+        if rel.get("commit"):
+            lines.append(f"    <li>Commit: {rel['commit']}</li>")
+        lines.append("  </ul>")
+    lines += [
+        "  <hr>",
+        "  <p><small>Pox Kernel · built for begonia · flash at your own risk.</small></p>",
+        "</body>",
+        "</html>",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def main() -> int:
@@ -140,7 +191,12 @@ def main() -> int:
         json.dump(payload, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
 
+    out_dir = os.path.dirname(os.path.abspath(args.out)) or "."
+    downloads_path = os.path.join(out_dir, "downloads.html")
+    with open(downloads_path, "w", encoding="utf-8") as handle:
+        handle.write(render_downloads_html(releases, payload["generated_at"]))
     print(f"Wrote {len(releases)} release(s) to {args.out}")
+    print(f"Wrote plain-HTML download index to {downloads_path}")
     return 0
 
 
