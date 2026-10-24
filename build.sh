@@ -422,11 +422,31 @@ fi
 DEFCONFIG="${DEFCONFIG:-$DEFAULT_DEFCONFIG}"
 BRANCH_CODENAME="$VERSION_NAME"
 
-# Derive dynamic localversion string: name, version, edition
+# Kernel release tag: root first, then media overlays, e.g.
+# 4.14.357-Pox-Apatch-C2, 4.14.357-Pox-KSU, 4.14.357-Pox-Vanilla.
+kernel_variant_tag() {
+    local tag token
+    case "$ROOT_FLAVOR" in
+        apatch)    tag="Apatch" ;;
+        folkpatch) tag="FolkPatch" ;;
+        ksu)       tag="KSU" ;;
+        *)         tag="Vanilla" ;;
+    esac
+    for token in $VARIANT; do
+        case "$token" in
+            *miui*|*hyperos*) [[ "$tag" == *-MIUI ]] || tag="$tag-MIUI" ;;
+            *c2*|*codec2*)    [[ "$tag" == *-C2 ]]   || tag="$tag-C2" ;;
+        esac
+    done
+    printf '%s' "$tag"
+}
+
+# Derive dynamic localversion string: Pox + variant. LOCALVERSION still wins
+# when a one-off build needs a fully custom suffix.
 if [[ -n "${LOCALVERSION:-}" ]]; then
     CUSTOM_LOCALVERSION="$LOCALVERSION"
 else
-    CUSTOM_LOCALVERSION="-${KERNEL_NAME}-${KERNEL_VERSION}-${VERSION_NAME}"
+    CUSTOM_LOCALVERSION="-Pox-$(kernel_variant_tag)"
 fi
 EXTENDED_LOCALVERSION="${EXTENDED_LOCALVERSION:-$CUSTOM_LOCALVERSION}"
 LINUX_VERSION="4.14.$(grep -m1 '^SUBLEVEL =' "$ROOT_DIR/Makefile" | awk '{print $3}')"
@@ -481,8 +501,8 @@ CLANG_TRIPLE=aarch64-linux-gnu-
 CROSS_COMPILE=aarch64-linux-gnu-
 AK3_DIR="$KERDEVDEP/anykernel"
 
-export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-TXO_R}"
-export KBUILD_BUILD_HOST="${KBUILD_BUILD_HOST:-${KERNEL_NAME}Kernel}"
+export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-Pox}"
+export KBUILD_BUILD_HOST="${KBUILD_BUILD_HOST:-Poxproject}"
 
 clean_build() {
     log "Cleaning build outputs in $OUT_DIR ..."
@@ -550,7 +570,7 @@ prepare_config() {
     # failing the vmlinux link for every variant.
     ./scripts/config --file "$OUT_DIR/.config" --enable SECTION_MISMATCH_WARN_ONLY
 
-    # Dynamically apply LOCALVERSION based on KERNEL_NAME and KERNEL_VERSION
+    # Apply the branded LOCALVERSION (4.14.357-Pox-<variant>)
     log "Setting CONFIG_LOCALVERSION=\"$CUSTOM_LOCALVERSION\" in .config"
     ./scripts/config --file "$OUT_DIR/.config" --set-str LOCALVERSION "$CUSTOM_LOCALVERSION"
 
