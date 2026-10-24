@@ -11591,35 +11591,110 @@ index 66c1fd251..1cfbbec7d 100644
  	if (error)
  		goto out;
  
-diff --git a/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch b/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch
+diff --git a/ksu-patches/ksu/0001-add-multi-manager-signs.patch b/ksu-patches/ksu/0001-add-multi-manager-signs.patch
 new file mode 100644
-index 000000000..6e1865fd8
+index 000000000..a9e213f9f
 --- /dev/null
-+++ b/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch
-@@ -0,0 +1,27 @@
++++ b/ksu-patches/ksu/0001-add-multi-manager-signs.patch
+@@ -0,0 +1,102 @@
 +diff --git a/kernel/manager/apk_sign.c b/kernel/manager/apk_sign.c
-+index eba496d5..f8fec53e 100644
++index eba496d..5bfbaef 100644
 +--- a/kernel/manager/apk_sign.c
 ++++ b/kernel/manager/apk_sign.c
-+@@ -36,6 +36,7 @@ static apk_sign_key_t apk_sign_keys[] = {
++@@ -36,6 +36,22 @@ static apk_sign_key_t apk_sign_keys[] = {
 + #ifdef CONFIG_KSU_MULTI_MANAGER_SUPPORT
 +     { EXPECTED_SIZE_OFFICIAL, EXPECTED_HASH_OFFICIAL }, // tiann/KernelSU
 +     { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, // KOWX712/KernelSU
 ++    { EXPECTED_SIZE_KSUNEXT, EXPECTED_HASH_KSUNEXT }, // KernelSU-Next/KernelSU-Next
+++    { EXPECTED_SIZE_SUKISU, EXPECTED_HASH_SUKISU }, // SukiSU-Ultra/SukiSU-Ultra
+++    { EXPECTED_SIZE_MKSU, EXPECTED_HASH_MKSU }, // 5ec1cff/KernelSU
+++    { EXPECTED_SIZE_RKSU, EXPECTED_HASH_RKSU }, // rsuntk/KernelSU
+++    { EXPECTED_SIZE_WILDKSU, EXPECTED_HASH_WILDKSU }, // WildKernels/Wild_KSU
+++    { EXPECTED_SIZE_MAMBOSU, EXPECTED_HASH_MAMBOSU }, // RapliVx/MamboSU
+++    { EXPECTED_SIZE_PERSHOOT, EXPECTED_HASH_PERSHOOT }, // pershoot/KernelSU-Next
+++    { EXPECTED_SIZE_VORTEXSU, EXPECTED_HASH_VORTEXSU }, // Arkael-Dev/VortexSU
+++    { EXPECTED_SIZE_VORTEX, EXPECTED_HASH_VORTEX }, // kingfinik98/VorteX
+++    { EXPECTED_SIZE_KAMISU, EXPECTED_HASH_KAMISU }, // kaminarich/KamiSU
+++    { EXPECTED_SIZE_NEKOSU, EXPECTED_HASH_NEKOSU }, // nksu-crew/NekoSU
+++    { EXPECTED_SIZE_NEKO, EXPECTED_HASH_NEKO }, // Neko/KernelSU (legacy)
+++    { EXPECTED_SIZE_KITTISU, EXPECTED_HASH_KITTISU }, // terebiko/KittiSU
+++    { EXPECTED_SIZE_AGNESSU, EXPECTED_HASH_AGNESSU }, // Yakayna/AgnesSU
+++    { EXPECTED_SIZE_YUKISU, EXPECTED_HASH_YUKISU }, // Rouyashiki/Anatdx/YukiSU
+++    { EXPECTED_SIZE_APKESU, EXPECTED_HASH_APKESU }, // fixz232/ApkeSU
 + #ifdef EXPECTED_SIZE
 +     { EXPECTED_SIZE, EXPECTED_HASH }, // Custom
 + #endif
 +diff --git a/kernel/manager/manager_sign.h b/kernel/manager/manager_sign.h
-+index a940135d..35d1597b 100644
++index a940135..5eafa75 100644
 +--- a/kernel/manager/manager_sign.h
 ++++ b/kernel/manager/manager_sign.h
-+@@ -13,6 +13,10 @@
++@@ -13,6 +13,70 @@
 + #define EXPECTED_SIZE_KOWX712 0x375
 + #define EXPECTED_HASH_KOWX712 "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"
 + 
-++// KernelSU-Next/KernelSU-Next (v3.4.2)
+++// KernelSU-Next/KernelSU-Next
 ++#define EXPECTED_SIZE_KSUNEXT 0x3e6
 ++#define EXPECTED_HASH_KSUNEXT "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7"
+++
+++// SukiSU-Ultra/SukiSU-Ultra (ShirkNeko)
+++#define EXPECTED_SIZE_SUKISU 0x35c
+++#define EXPECTED_HASH_SUKISU "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef"
+++
+++// 5ec1cff/KernelSU (MKSU)
+++#define EXPECTED_SIZE_MKSU 0x180
+++#define EXPECTED_HASH_MKSU "7e0c6d7278a3bb8e364e0fcba95afaf3666cf5ff3c245a3b63c8833bd0445cc4"
+++
+++// rsuntk/KernelSU (RKSU)
+++#define EXPECTED_SIZE_RKSU 0x396
+++#define EXPECTED_HASH_RKSU "f415f4ed9435427e1fdf7f1fccd4dbc07b3d6b8751e4dbcec6f19671f427870b"
+++
+++// WildKernels/Wild_KSU
+++#define EXPECTED_SIZE_WILDKSU 0x381
+++#define EXPECTED_HASH_WILDKSU "52d52d8c8bfbe53dc2b6ff1c613184e2c03013e090fe8905d8e3d5dc2658c2e4"
+++
+++// RapliVx/MamboSU
+++#define EXPECTED_SIZE_MAMBOSU 0x384
+++#define EXPECTED_HASH_MAMBOSU "a9462b8b98ea1ca7901b0cbdcebfaa35f0aa95e51b01d66e6b6d2c81b97746d8"
+++
+++// pershoot/KernelSU-Next
+++#define EXPECTED_SIZE_PERSHOOT 0x338
+++#define EXPECTED_HASH_PERSHOOT "f26471a28031130362bce7eebffb9a0b8afc3095f163ce0c75a309f03b644a1f"
+++
+++// Arkael-Dev/VortexSU
+++#define EXPECTED_SIZE_VORTEXSU 0x381
+++#define EXPECTED_HASH_VORTEXSU "67eec44718428adad14e6a9dca57822759aba7e77a8cad7071f6f6704df8bb48"
+++
+++// kingfinik98/VorteX
+++#define EXPECTED_SIZE_VORTEX 0x317
+++#define EXPECTED_HASH_VORTEX "4d3c9a3f40b4acab5d89d74eb5f2edf92a6af71a366b9484de507220739d025b"
+++
+++// kaminarich/KamiSU
+++#define EXPECTED_SIZE_KAMISU 0x2e8
+++#define EXPECTED_HASH_KAMISU "13c415105fad7b798e5584798d82ea334729f0c24de7b9d4cd2f2e1b062eb566"
+++
+++// nksu-crew/NekoSU
+++#define EXPECTED_SIZE_NEKOSU 0x56a
+++#define EXPECTED_HASH_NEKOSU "d809b63480beea6086cd7868e42f2eb2b9202c670c0d3db0894e9e4312f128e9"
+++
+++// Neko/KernelSU (legacy signing key)
+++#define EXPECTED_SIZE_NEKO 0x29c
+++#define EXPECTED_HASH_NEKO "946b0557e450a6430a0ba6b6bccee5bc12953ec8735d55e26139b0ec12303b21"
+++
+++// terebiko/KittiSU
+++#define EXPECTED_SIZE_KITTISU 0x390
+++#define EXPECTED_HASH_KITTISU "8a38ea45034a145e29234c4927743b088ef502441f8d24583a1a18f20e4c879a"
+++
+++// Yakayna/AgnesSU
+++#define EXPECTED_SIZE_AGNESSU 0x364
+++#define EXPECTED_HASH_AGNESSU "2d19acc8d27c1285e2ca04ffb60fbcb0d44b05daf2cfdbf5f7101aa17e2dc849"
+++
+++// Rouyashiki/Anatdx/YukiSU
+++#define EXPECTED_SIZE_YUKISU 0x29c
+++#define EXPECTED_HASH_YUKISU "39559b380d4c0191eed81b7eba61533b6a2f247bc55bceba4259e983673f58b7"
+++
+++// fixz232/ApkeSU
+++#define EXPECTED_SIZE_APKESU 0x2e8
+++#define EXPECTED_HASH_APKESU "1c89980c03432844cfe195dab90bfaecbcd987d19309da648014164be78007d1"
 ++
 + typedef struct {
 +     unsigned size;
