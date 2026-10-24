@@ -445,6 +445,13 @@ prepare_config() {
         ./scripts/config --file "$OUT_DIR/.config" --disable INLINE_OPTIMIZATION
     fi
 
+    # Clang 18 emits an out-of-line `strlcpy.inline` clone shared by init and
+    # non-init callers; it references .init.data variables (boot_command_line,
+    # saved_root_name, ...), which modpost reports as section mismatches. They
+    # are false positives for this tree, so keep them as warnings instead of
+    # failing the vmlinux link for every variant.
+    ./scripts/config --file "$OUT_DIR/.config" --enable SECTION_MISMATCH_WARN_ONLY
+
     # Dynamically apply LOCALVERSION based on KERNEL_NAME and KERNEL_VERSION
     log "Setting CONFIG_LOCALVERSION=\"$CUSTOM_LOCALVERSION\" in .config"
     ./scripts/config --file "$OUT_DIR/.config" --set-str LOCALVERSION "$CUSTOM_LOCALVERSION"
