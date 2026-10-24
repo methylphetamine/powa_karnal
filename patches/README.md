@@ -9,9 +9,9 @@ when upstream updates land.
 | Variant | Kernel side | Manager / flashing |
 | --- | --- | --- |
 | `vanilla` | none (onyx base) | none |
-| `apatch` | `apatch.patch` (APatch defconfig + NoMount) | latest APatch APK bundled, auto-flashed during kernel flash |
+| `apatch` | `apatch.patch` (APatch defconfig + NoMount v2.2.0) | latest APatch APK bundled, auto-flashed during kernel flash |
 | `folkpatch` | `apatch.patch` (same KernelPatch-based kernel side) | latest FolkPatch APK bundled, auto-flashed during kernel flash |
-| `ksu` | `ksu.patch` (BakaSU submodule + NoMount + SuSFS + BakaSU/KSU-Next manager signs) | manager installed separately (BakaSU or KSU-Next) |
+| `ksu` | `ksu.patch` (BakaSU submodule + NoMount v2.2.0 + SuSFS + BakaSU/KSU-Next manager signs) | manager installed separately (BakaSU or KSU-Next) |
 
 `apatch` and `folkpatch` produce a zip that, after writing the kernel, extracts
 the bundled manager package and runs its installer against the new boot image
