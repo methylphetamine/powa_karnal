@@ -530,7 +530,7 @@ prepare_config() {
 
     if ! "$KERDEVDEP/clang/bin/clang" --target=aarch64-linux-gnu \
         -mllvm -polly -mllvm -polly-postopts=1 -mllvm -polly-ast-use-context \
-        -mllvm -polly-detect-keep-going -mllvm -polly-vectorizer=stripmine \
+        -mllvm -polly-vectorizer=stripmine \
         -mllvm -polly-invariant-load-hoisting -c "$test_src" -o /dev/null 2>/dev/null; then
         log "Toolchain lacks patched LLVM Polly - disabling CONFIG_LLVM_POLLY"
         ./scripts/config --file "$OUT_DIR/.config" --disable LLVM_POLLY
