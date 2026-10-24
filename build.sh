@@ -258,15 +258,19 @@ apply_variant_patches() {
 # Restore the clean onyx tree: reverse every applied patch set (overlays were
 # applied last), then drop the KernelSU checkout added by the ksu patch.
 unapply_variant_patches() {
-    local patches=() f i
+    local roots=() overlays=() f name i
     for f in "$PATCH_DIR"/*.patch; do
         [[ -f "$f" ]] || continue
         if git apply --reverse --check "$f" >/dev/null 2>&1; then
-            patches+=("$f")
+            name="$(basename "$f" .patch)"
+            case "$name" in
+                miui|c2) overlays+=("$f") ;;
+                *)       roots+=("$f") ;;
+            esac
         fi
     done
 
-    if ((${#patches[@]} == 0)); then
+    if ((${#roots[@]} + ${#overlays[@]} == 0)); then
         log "No variant patches are applied."
         return 0
     fi
@@ -276,10 +280,18 @@ unapply_variant_patches() {
         git submodule deinit -f --all >/dev/null 2>&1 || true
     fi
 
-    for ((i=${#patches[@]}-1; i>=0; i--)); do
-        log "Reverting variant patch: ${patches[i]#$ROOT_DIR/}"
-        git apply --reverse --index "${patches[i]}" || {
-            err "Could not revert ${patches[i]#$ROOT_DIR/} cleanly."
+    # Match application order in reverse: overlays were applied after roots.
+    for ((i=${#overlays[@]}-1; i>=0; i--)); do
+        log "Reverting variant patch: ${overlays[i]#$ROOT_DIR/}"
+        git apply --reverse --index "${overlays[i]}" || {
+            err "Could not revert ${overlays[i]#$ROOT_DIR/} cleanly."
+            exit 1
+        }
+    done
+    for ((i=${#roots[@]}-1; i>=0; i--)); do
+        log "Reverting variant patch: ${roots[i]#$ROOT_DIR/}"
+        git apply --reverse --index "${roots[i]}" || {
+            err "Could not revert ${roots[i]#$ROOT_DIR/} cleanly."
             exit 1
         }
     done
