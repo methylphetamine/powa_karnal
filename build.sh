@@ -87,18 +87,18 @@ fi
 # Variant selection
 # ---------------------------------------------------------------------------
 # The repository keeps one source branch (`onyx`). Root flavors (vanilla,
-# APatch, FolkPatch, KernelSU/ReSukiSU) and media overlays (MIUI/HyperOS,
-# Codec2) are shipped as patch sets under patches/ and applied on top of that
-# branch at build time.
+# APatch, FolkPatch, KernelSU) and media overlays (MIUI/HyperOS, Codec2) are
+# shipped as patch sets under patches/ and applied on top of that branch at
+# build time.
 #
 #   VARIANT=vanilla          stock build, no patches
-#   VARIANT=ksu              ReSukiSU + NoMount + SuSFS + KSU-Next manager sign
+#   VARIANT=ksu              BakaSU + NoMount + SuSFS + BakaSU/KSU-Next manager
 #   VARIANT=ksu,c2           KSU root + Codec2 overlay
 #   VARIANT=apatch,miui      APatch root (auto-flashed) + MIUI overlay
 #   VARIANT=folkpatch        FolkPatch root (same kernel, FolkPatch package)
 #
 # When VARIANT is unset the branch/tag name is used for backwards
-# compatibility, so `onyx-ksun-next` still builds the KSU-Next edition.
+# compatibility, so `onyx-ksu-next` still builds the KSU edition.
 VARIANT="${VARIANT:-${ROOT_VARIANT:-}}"
 VARIANT="${VARIANT//,/ }"
 VARIANT="$(echo "$VARIANT" | xargs)"
@@ -245,6 +245,9 @@ apply_variant_patches() {
     # A ksu patch adds .gitmodules + a KernelSU gitlink; the submodule itself
     # still has to be checked out.
     if [[ -f "$ROOT_DIR/.gitmodules" ]]; then
+        # Sync first so switching a root submodule (for example ReSukiSU ->
+        # BakaSU) cannot reuse a stale URL from .git/config.
+        git submodule sync --recursive >/dev/null
         git submodule update --init --recursive || {
             err "Failed to initialise submodules added by the variant patch."
             exit 1
@@ -335,7 +338,7 @@ apply_root_patches() {
 #
 # One resolver maps the selected variant (or branch/tag name) to an edition,
 # description and default defconfig. Root flavors and media overlays compose,
-# so `onyx-c2-ksun` reports "Onyx-C2-KSU-Next" instead of a generic fallback.
+# so `onyx-c2-ksun` reports "Onyx-C2-KSU" instead of a generic fallback.
 resolve_variant() {
     local branch="$1"
     local root="" root_desc="" defconfig="begonia_user_defconfig"
@@ -344,11 +347,10 @@ resolve_variant() {
     # Root flavor. Order matters: `folkpatch` is matched before `apatch` and
     # `sultan` before the generic APatch pattern so the right label wins.
     case "$branch" in
-        *resukisu*)                   root="ReSukiSU"; root_desc="ReSukiSU Root";               defconfig="resukisu_defconfig" ;;
         *folkpatch*)                  root="FolkPatch"; root_desc="FolkPatch";            defconfig="begonia_apatch_defconfig" ;;
         *apatch*)                     root="APatch";   root_desc="APatch";                  defconfig="begonia_apatch_defconfig" ;;
         *sultan*)                     root="Sultan-APatch"; root_desc="Sultan Debloat APatch"; defconfig="begonia_apatch_defconfig" ;;
-        *ksun*|*ksu-next*|*kernelsu*|*reksun*|*ksu*) root="KSU-Next"; root_desc="KernelSU-Next + ReSukiSU"; defconfig="reksun_defconfig" ;;
+        *ksun*|*ksu-next*|*kernelsu*|*reksun*|*ksu*) root="KSU"; root_desc="KernelSU-Next + BakaSU"; defconfig="bakasu_defconfig" ;;
         *kaeru*)                      root="Kaeru";    root_desc="Kaeru Bootloader";            defconfig="begonia_user_defconfig" ;;
     esac
 
@@ -400,7 +402,7 @@ else
 fi
 
 # Apply the selected variant before resolving the defconfig: the patch is what
-# adds root-specific defconfigs (begonia_apatch_defconfig, reksun_defconfig).
+# adds root-specific defconfigs (begonia_apatch_defconfig, bakasu_defconfig).
 case "$ACTION" in
     clean|distclean) ;;
     *)
@@ -527,7 +529,7 @@ merge_config_fragments() {
     fi
 
     # MIUI/HyperOS overlay: the variant patch adds this fragment; merge it into
-    # whichever root defconfig was selected (user/reksun/apatch).
+    # whichever root defconfig was selected (user/bakasu/apatch).
     if [[ -f "$ROOT_DIR/arch/arm64/configs/miui.config" ]] && \
        [[ "$VERSION_NAME" == *MIUI* || "$VARIANT" == *miui* || "$VARIANT" == *hyperos* ]]; then
         log "Merging MIUI/HyperOS config fragment..."

@@ -11,7 +11,7 @@ when upstream updates land.
 | `vanilla` | none (onyx base) | none |
 | `apatch` | `apatch.patch` (APatch defconfig + NoMount) | latest APatch APK bundled, auto-flashed during kernel flash |
 | `folkpatch` | `apatch.patch` (same KernelPatch-based kernel side) | latest FolkPatch APK bundled, auto-flashed during kernel flash |
-| `ksu` | `ksu.patch` (ReSukiSU submodule + NoMount + SuSFS + KSU-Next manager sign) | manager installed separately (KSU-Next / ReSukiSU) |
+| `ksu` | `ksu.patch` (BakaSU submodule + NoMount + SuSFS + BakaSU/KSU-Next manager signs) | manager installed separately (BakaSU or KSU-Next) |
 
 `apatch` and `folkpatch` produce a zip that, after writing the kernel, extracts
 the bundled manager package and runs its installer against the new boot image
@@ -59,7 +59,7 @@ configured.
 | Patch | Files | Notes |
 | --- | --- | --- |
 | `apatch.patch` | `begonia_apatch_defconfig`, `drivers/kernelsu` symlink, `fs/nomount/*` | used by both `apatch` and `folkpatch` |
-| `ksu.patch` | `.gitmodules` + `KernelSU` gitlink (ReSukiSU), `reksun_defconfig`, `fs/nomount/*`, `fs/susfs.c`, `ksu-patches/ksu/*` | root drivers, applied before overlays |
+| `ksu.patch` | `.gitmodules` + `KernelSU` gitlink (BakaSU), `bakasu_defconfig`, `fs/nomount/*`, `fs/susfs.c`, `ksu-patches/ksu/*` | root drivers, applied before overlays |
 | `miui.patch` | WLAN drivers, `miui.config` | overlay |
 | `c2.patch` | MTK VCODEC/VCU, V4L2 uapi | overlay |
 
@@ -97,5 +97,5 @@ configured.
   applying after an upstream sync, rebase the source change and regenerate.
 - Keep patches scoped to their variant. Shared fixes belong on `onyx`.
 - Defconfigs added by a patch must match the resolver
-  (`begonia_apatch_defconfig`, `reksun_defconfig`).
+  (`begonia_apatch_defconfig`, `bakasu_defconfig`).
 - Root patches are applied before overlays; keep them independently applicable.

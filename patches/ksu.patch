@@ -1,24 +1,24 @@
 diff --git a/.gitmodules b/.gitmodules
 new file mode 100644
-index 0000000..0896ae4
+index 000000000..df486fca7
 --- /dev/null
 +++ b/.gitmodules
 @@ -0,0 +1,3 @@
 +[submodule "KernelSU"]
 +	path = KernelSU
-+	url = https://github.com/ReSukiSU/ReSukiSU.git
++	url = https://github.com/Baka-SU/BakaSU.git
 diff --git a/KernelSU b/KernelSU
 new file mode 160000
-index 0000000..239e1e8
+index 000000000..39faf94a2
 --- /dev/null
 +++ b/KernelSU
 @@ -0,0 +1 @@
-+Subproject commit 239e1e8871b8fcd51a6e5b3002e0ba522fdd99fb
-diff --git a/arch/arm64/configs/reksun_defconfig b/arch/arm64/configs/reksun_defconfig
++Subproject commit 39faf94a2d4a40d48093398bafcde649916edbc1
+diff --git a/arch/arm64/configs/bakasu_defconfig b/arch/arm64/configs/bakasu_defconfig
 new file mode 100644
-index 0000000..e0bb03a
+index 000000000..b3dfc0350
 --- /dev/null
-+++ b/arch/arm64/configs/reksun_defconfig
++++ b/arch/arm64/configs/bakasu_defconfig
 @@ -0,0 +1,5288 @@
 +#
 +# Automatically generated file; DO NOT EDIT.
@@ -5279,7 +5279,7 @@ index 0000000..e0bb03a
 +# CONFIG_STRING_SELFTEST is not set
 +CONFIG_HWCONF_MANAGER=y
 +
-+# ReSukiSU v4.2.0-rc3 (4.14 manual/inline hook mode)
++# BakaSU main 39faf94 (4.14 SUSFS inline hook mode)
 +CONFIG_KSU=y
 +# CONFIG_KSU_DEBUG is not set
 +CONFIG_KSU_TOOLKIT_SUPPORT=y
@@ -5309,7 +5309,7 @@ index 0000000..e0bb03a
 +CONFIG_KALLSYMS=y
 +CONFIG_KALLSYMS_ALL=y
 diff --git a/drivers/Kconfig b/drivers/Kconfig
-index d5c764e..b2dba2b 100644
+index d5c764e00..b2dba2bb4 100644
 --- a/drivers/Kconfig
 +++ b/drivers/Kconfig
 @@ -223,4 +223,6 @@ source "drivers/p73-spi/6873/Kconfig"
@@ -5320,7 +5320,7 @@ index d5c764e..b2dba2b 100644
 +
  endmenu
 diff --git a/drivers/Makefile b/drivers/Makefile
-index e1c352c..fce3b18 100644
+index e1c352cf2..fce3b18d9 100644
 --- a/drivers/Makefile
 +++ b/drivers/Makefile
 @@ -187,3 +187,4 @@ obj-$(CONFIG_MULTIPLEXER)	+= mux/
@@ -5329,7 +5329,7 @@ index e1c352c..fce3b18 100644
  obj-$(CONFIG_NXP_P73_DEVICES) += p73-spi/
 +obj-$(CONFIG_KSU) += kernelsu/
 diff --git a/drivers/input/input.c b/drivers/input/input.c
-index 55d84ea..47b0698 100644
+index 55d84eaf9..47b069881 100644
 --- a/drivers/input/input.c
 +++ b/drivers/input/input.c
 @@ -526,11 +526,21 @@ static void input_handle_event(struct input_dev *dev,
@@ -5355,7 +5355,7 @@ index 55d84ea..47b0698 100644
  
  		spin_lock_irqsave(&dev->event_lock, flags);
 diff --git a/fs/Kconfig b/fs/Kconfig
-index 479dc55..82069f3 100644
+index 479dc5549..82069f33f 100644
 --- a/fs/Kconfig
 +++ b/fs/Kconfig
 @@ -60,6 +60,8 @@ config FS_DAX_PMD
@@ -5368,7 +5368,7 @@ index 479dc55..82069f3 100644
  #
  # Note: Posix ACLs can be implemented without these helpers.  Never use
 diff --git a/fs/Makefile b/fs/Makefile
-index ce39020..5dd6130 100644
+index ce39020c8..5dd613087 100644
 --- a/fs/Makefile
 +++ b/fs/Makefile
 @@ -54,6 +54,9 @@ obj-$(CONFIG_SYSCTL)		+= drop_caches.o
@@ -5382,7 +5382,7 @@ index ce39020..5dd6130 100644
  
  obj-$(CONFIG_PROC_FS)		+= proc/
 diff --git a/fs/exec.c b/fs/exec.c
-index f39d1c0..c2621c2 100644
+index f39d1c031..c2621c2d9 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -1899,12 +1899,20 @@ int do_execve_file(struct file *file, void *__argv, void *__envp)
@@ -5417,7 +5417,7 @@ index f39d1c0..c2621c2 100644
  }
  
 diff --git a/fs/namei.c b/fs/namei.c
-index a982495..081a1bf 100644
+index a982495f5..081a1bff3 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -39,6 +39,9 @@
@@ -5722,7 +5722,7 @@ index a982495..081a1bf 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 540ed0a..f0aadf6 100644
+index 540ed0ab0..d9cd741b7 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -26,10 +26,39 @@
@@ -6132,7 +6132,7 @@ index 540ed0a..f0aadf6 100644
  	.owner		= mntns_owner,
  };
 +
-+#if 0 /* SUSFS 2.1: try_umount handled by ReSukiSU kernel_umount.c */
++#if 0 /* SUSFS 2.1: try_umount handled by BakaSU kernel_umount.c */
 +extern void susfs_try_umount_all(uid_t uid);
 +void susfs_run_try_umount_for_current_mnt_ns(void) {
 +	struct mount *mnt;
@@ -6164,7 +6164,7 @@ index 540ed0a..f0aadf6 100644
 +#endif
 diff --git a/fs/nomount/Kconfig b/fs/nomount/Kconfig
 new file mode 100644
-index 0000000..638b942
+index 000000000..638b9427e
 --- /dev/null
 +++ b/fs/nomount/Kconfig
 @@ -0,0 +1,8 @@
@@ -6178,7 +6178,7 @@ index 0000000..638b942
 +	  without mounting filesystems. Useful for systemless modifications.
 diff --git a/fs/nomount/Makefile b/fs/nomount/Makefile
 new file mode 100644
-index 0000000..3d9a196
+index 000000000..3d9a1961f
 --- /dev/null
 +++ b/fs/nomount/Makefile
 @@ -0,0 +1,4 @@
@@ -6188,7 +6188,7 @@ index 0000000..3d9a196
 +ccflags-y += -std=gnu11 -Wno-declaration-after-statement
 diff --git a/fs/nomount/README.pox b/fs/nomount/README.pox
 new file mode 100644
-index 0000000..e20cb6e
+index 000000000..e20cb6edb
 --- /dev/null
 +++ b/fs/nomount/README.pox
 @@ -0,0 +1,2 @@
@@ -6196,7 +6196,7 @@ index 0000000..e20cb6e
 +Source: https://github.com/maxsteeel/nomount
 diff --git a/fs/nomount/nomount.c b/fs/nomount/nomount.c
 new file mode 100644
-index 0000000..5dc289b
+index 000000000..5dc289b79
 --- /dev/null
 +++ b/fs/nomount/nomount.c
 @@ -0,0 +1,1699 @@
@@ -7901,7 +7901,7 @@ index 0000000..5dc289b
 +module_exit(nomount_exit);
 diff --git a/fs/nomount/nomount.h b/fs/nomount/nomount.h
 new file mode 100644
-index 0000000..d34966c
+index 000000000..d34966cde
 --- /dev/null
 +++ b/fs/nomount/nomount.h
 @@ -0,0 +1,368 @@
@@ -8274,7 +8274,7 @@ index 0000000..d34966c
 +
 +#endif /* _LINUX_NOMOUNT_H */
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index d309171..74a4ea4 100644
+index d309171b6..74a4ea497 100644
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -13,6 +13,9 @@
@@ -8366,7 +8366,7 @@ index d309171..74a4ea4 100644
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   inotify_mark_user_mask(mark));
 diff --git a/fs/open.c b/fs/open.c
-index 377929e..0953588 100644
+index 377929e7f..233649899 100644
 --- a/fs/open.c
 +++ b/fs/open.c
 @@ -354,6 +354,11 @@ SYSCALL_DEFINE4(fallocate, int, fd, int, mode, loff_t, offset, loff_t, len)
@@ -8387,9 +8387,9 @@ index 377929e..0953588 100644
  	unsigned int lookup_flags = LOOKUP_FOLLOW;
 +#ifdef CONFIG_KSU
 +	/*
-+	 * CONFIG_KSU_SUSFS makes ReSukiSU export the struct filename **
++	 * CONFIG_KSU_SUSFS makes BakaSU export the struct filename **
 +	 * variant of this hook, not const char __user **. Passing the
-+	 * raw user pointer here made ReSukiSU dereference the pathname
++	 * raw user pointer here made BakaSU dereference the pathname
 +	 * bytes as a struct filename and oops.
 +	 *
 +	 * getname() also lets kernel-internal callers through unchanged:
@@ -8483,7 +8483,7 @@ index 377929e..0953588 100644
  	return fd;
  }
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index b0b88b7..c13d786 100644
+index b0b88b729..c13d78609 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -98,6 +98,9 @@
@@ -8515,7 +8515,7 @@ index b0b88b7..c13d786 100644
  				continue;
  
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
-index 96fc702..5150dfc 100644
+index 96fc70225..5150dfcc2 100644
 --- a/fs/proc/fd.c
 +++ b/fs/proc/fd.c
 @@ -12,6 +12,9 @@
@@ -8563,7 +8563,7 @@ index 96fc702..5150dfc 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 893f79f..07bdd21 100644
+index 893f79fcc..07bdd2136 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -19,12 +19,19 @@
@@ -8614,7 +8614,7 @@ index 893f79f..07bdd21 100644
  	end = vma->vm_end;
  	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
-index b859aae..25b8c93 100644
+index b859aaeec..25b8c9377 100644
 --- a/fs/proc_namespace.c
 +++ b/fs/proc_namespace.c
 @@ -12,12 +12,18 @@
@@ -8673,7 +8673,7 @@ index b859aae..25b8c93 100644
  	if (sb->s_op->show_devname) {
  		seq_puts(m, "device ");
 diff --git a/fs/read_write.c b/fs/read_write.c
-index 0da6e4f..db5f2da 100644
+index 0da6e4f19..db5f2da4b 100644
 --- a/fs/read_write.c
 +++ b/fs/read_write.c
 @@ -568,11 +568,20 @@ static inline void file_pos_write(struct file *file, loff_t pos)
@@ -8698,7 +8698,7 @@ index 0da6e4f..db5f2da 100644
  		loff_t pos = file_pos_read(f.file);
  		ret = vfs_read(f.file, buf, count, &pos);
 diff --git a/fs/readdir.c b/fs/readdir.c
-index e6f4c7b..3f6bd82 100644
+index e6f4c7b88..3f6bd8220 100644
 --- a/fs/readdir.c
 +++ b/fs/readdir.c
 @@ -23,6 +23,11 @@
@@ -8815,7 +8815,7 @@ index e6f4c7b..3f6bd82 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index 0fda4b6..6b80c1e 100644
+index 0fda4b6b8..6b80c1ece 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -17,6 +17,9 @@
@@ -8895,7 +8895,7 @@ index 0fda4b6..6b80c1e 100644
  	if (error)
  		return error;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index e6ceb3e..28480a8 100644
+index e6ceb3e87..28480a88e 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,6 +9,10 @@
@@ -8940,7 +8940,7 @@ index e6ceb3e..28480a8 100644
  
 diff --git a/fs/susfs.c b/fs/susfs.c
 new file mode 100644
-index 0000000..5804bee
+index 000000000..5804bee21
 --- /dev/null
 +++ b/fs/susfs.c
 @@ -0,0 +1,1561 @@
@@ -10506,7 +10506,7 @@ index 0000000..5804bee
 +/* No module exit is needed becuase it should never be a loadable kernel module */
 +//void __init susfs_exit(void)
 diff --git a/include/linux/mount.h b/include/linux/mount.h
-index 1ff21c1..99adc5d 100644
+index 1ff21c19b..99adc5d71 100644
 --- a/include/linux/mount.h
 +++ b/include/linux/mount.h
 @@ -69,6 +69,9 @@ struct vfsmount {
@@ -10520,7 +10520,7 @@ index 1ff21c1..99adc5d 100644
  
  struct file; /* forward dec */
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4975af4..ecb50c3 100644
+index 4975af452..ecb50c314 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1412,6 +1412,10 @@ struct task_struct {
@@ -10536,7 +10536,7 @@ index 4975af4..ecb50c3 100644
  	/* CPU-specific state of this task: */
 diff --git a/include/linux/susfs.h b/include/linux/susfs.h
 new file mode 100644
-index 0000000..2c9da3e
+index 000000000..2c9da3e96
 --- /dev/null
 +++ b/include/linux/susfs.h
 @@ -0,0 +1,242 @@
@@ -10784,7 +10784,7 @@ index 0000000..2c9da3e
 +#endif
 diff --git a/include/linux/susfs_def.h b/include/linux/susfs_def.h
 new file mode 100644
-index 0000000..f8eaeaa
+index 000000000..f8eaeaacd
 --- /dev/null
 +++ b/include/linux/susfs_def.h
 @@ -0,0 +1,150 @@
@@ -10940,9 +10940,10 @@ index 0000000..f8eaeaa
 +#endif // #ifndef KSU_SUSFS_DEF_H
 \ No newline at end of file
 diff --git a/kernel/reboot.c b/kernel/reboot.c
+index eea91461e..beb41f2bf 100644
 --- a/kernel/reboot.c
 +++ b/kernel/reboot.c
-@@ -17,6 +17,17 @@
+@@ -17,6 +17,15 @@
  #include <linux/syscore_ops.h>
  #include <linux/uaccess.h>
  
@@ -10951,8 +10952,6 @@ diff --git a/kernel/reboot.c b/kernel/reboot.c
 +#endif
 +
 +#ifdef CONFIG_KSU
-+/* Must match KSU_INSTALL_MAGIC1 in uapi/supercall.h (KernelSU-Next). */
-+#define KSU_INSTALL_MAGIC1 0xDEADBEEF
 +extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 +				void __user **arg);
 +#endif
@@ -10960,27 +10959,21 @@ diff --git a/kernel/reboot.c b/kernel/reboot.c
  /*
   * this indicates whether you can reboot with ctrl-alt-del: the default is yes
   */
-@@ -291,6 +302,18 @@
+@@ -291,6 +300,12 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
  	char buffer[256];
  	int ret = 0;
  
 +#ifdef CONFIG_KSU
-+	/*
-+	 * KernelSU supercalls ride on the reboot syscall under a private magic.
-+	 * Only consume those; every other call (including normal restarts) must
-+	 * fall through to the real reboot handling below.
-+	 */
-+	if (magic1 == KSU_INSTALL_MAGIC1) {
-+		ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
-+		return 0;
-+	}
++	ret = ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++	if (ret != -EINVAL)
++		return ret;
 +#endif
 +
  	/* We only trust the superuser with rebooting the system. */
  	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
  		return -EPERM;
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 66c1fd2..1cfbbec 100644
+index 66c1fd251..1cfbbec7d 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -62,6 +62,10 @@
@@ -11173,39 +11166,63 @@ index 66c1fd2..1cfbbec 100644
  
 diff --git a/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch b/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch
 new file mode 100644
-index 0000000..77a7b72
+index 000000000..6e1865fd8
 --- /dev/null
 +++ b/ksu-patches/ksu/0001-add-ksunext-manager-sign.patch
 @@ -0,0 +1,27 @@
 +diff --git a/kernel/manager/apk_sign.c b/kernel/manager/apk_sign.c
-+index b87461d..df97164 100644
++index eba496d5..f8fec53e 100644
 +--- a/kernel/manager/apk_sign.c
 ++++ b/kernel/manager/apk_sign.c
-+@@ -39,6 +39,7 @@ static apk_sign_key_t apk_sign_keys[] = {
-+     { EXPECTED_SIZE_RSUNTK, EXPECTED_HASH_RSUNTK }, // rsuntk/KernelSU
-+     { EXPECTED_SIZE_SUKISU, EXPECTED_HASH_SUKISU }, // SukiSU-Ultra/SukiSU-Ultra
++@@ -36,6 +36,7 @@ static apk_sign_key_t apk_sign_keys[] = {
++ #ifdef CONFIG_KSU_MULTI_MANAGER_SUPPORT
++     { EXPECTED_SIZE_OFFICIAL, EXPECTED_HASH_OFFICIAL }, // tiann/KernelSU
 +     { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, // KOWX712/KernelSU
 ++    { EXPECTED_SIZE_KSUNEXT, EXPECTED_HASH_KSUNEXT }, // KernelSU-Next/KernelSU-Next
 + #ifdef EXPECTED_SIZE
 +     { EXPECTED_SIZE, EXPECTED_HASH }, // Custom
 + #endif
 +diff --git a/kernel/manager/manager_sign.h b/kernel/manager/manager_sign.h
-+index 87e7833..564f47b 100644
++index a940135d..35d1597b 100644
 +--- a/kernel/manager/manager_sign.h
 ++++ b/kernel/manager/manager_sign.h
-+@@ -25,6 +25,10 @@
++@@ -13,6 +13,10 @@
 + #define EXPECTED_SIZE_KOWX712 0x375
 + #define EXPECTED_HASH_KOWX712 "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"
 + 
-++// KernelSU-Next/KernelSU-Next
+++// KernelSU-Next/KernelSU-Next (v3.4.2)
 ++#define EXPECTED_SIZE_KSUNEXT 0x3e6
 ++#define EXPECTED_HASH_KSUNEXT "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7"
 ++
 + typedef struct {
 +     unsigned size;
 +     const char *sha256;
+diff --git a/ksu-patches/ksu/0002-allow-susfs-build-on-nongki.patch b/ksu-patches/ksu/0002-allow-susfs-build-on-nongki.patch
+new file mode 100644
+index 000000000..97e0bf950
+--- /dev/null
++++ b/ksu-patches/ksu/0002-allow-susfs-build-on-nongki.patch
+@@ -0,0 +1,18 @@
++diff --git a/kernel/tools/susfs_compat.mk b/kernel/tools/susfs_compat.mk
++index 9a70255d..87f31a85 100644
++--- a/kernel/tools/susfs_compat.mk
+++++ b/kernel/tools/susfs_compat.mk
++@@ -15,6 +15,7 @@ $(info -- $(REPO_NAME)/compat: ksu_install_su_fd direct call found)
++ ccflags-y += -DKSU_COMPAT_HAS_SUSFS_INSTALL_SU_FD_DIRECT_CALL
++ endif
++ 
++-$(info -- $(REPO_NAME): susfs has NOT update with latest KernelSU source)
++-$(info -- $(REPO_NAME): Please wait simonpunk update)
++-$(error Please wait susfs update.)
++\ No newline at end of file
+++# POX: upstream BakaSU main suspends the SUSFS build here with an unconditional
+++# $(error), pending simonpunk syncing SUSFS with main's selinux_hide rework.
+++# The BakaSU<->SUSFS kernel interface is unchanged for non-GKI 4.14 (SUSFS falls
+++# back to the auto selinux_hide hook), so the build is allowed to proceed.
++\ No newline at end of file
++
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index 61418c6..d7c8f0a 100644
+index 61418c6e2..d7c8f0ad1 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -28,6 +28,7 @@
@@ -11236,7 +11253,7 @@ index 61418c6..d7c8f0a 100644
  		audit_log_format(ab, " tsid=%d", tsid);
  	else {
 diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
-index 0eeadfe..bb7a5b5 100644
+index 0eeadfe8b..bb7a5b59e 100644
 --- a/security/selinux/selinuxfs.c
 +++ b/security/selinux/selinuxfs.c
 @@ -264,7 +264,7 @@ static int sel_mmap_handle_status(struct file *filp,

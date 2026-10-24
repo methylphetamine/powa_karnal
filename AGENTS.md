@@ -7,19 +7,19 @@ This document establishes the **mandatory, non-negotiable rules** for all AI age
 ## 0. One Branch, Variants as Patches (READ FIRST)
 * **Single source branch**: All work lands on **`onyx`** (the default branch). There is exactly **one** long-lived branch. Do **not** create `onyx-ksun`, `onyx-miui`, `onyx-c2`, `onyx-apatch`, `onyx-bakasu` or any other per-variant branch, and do not push variant work to `main` (kept as a mirror during migration).
 * **Variants are patch sets**: Root flavors and media overlays live in `patches/` and are applied at build time by `build.sh`:
-  * Roots: `apatch.patch` (also used by `folkpatch`), `ksu.patch`; `vanilla` means no patch.
+  * Roots: `apatch.patch` (also used by `folkpatch`), `ksu.patch` (BakaSU); `vanilla` means no patch.
   * Overlays: `miui.patch`, `c2.patch`
 * **Where a change belongs**:
   * Shared kernel fixes, upstream syncs, defconfig baseline changes → commit directly on `onyx` (no patch).
   * Anything that only exists because of a root flavor (KernelSU submodule, KSU/SuSFS/NoMount glue, root defconfig) → edit the matching `patches/<root>.patch` and regenerate it.
   * Anything that only exists for a media overlay (WLAN/HyperOS knobs, MTK VCODEC/VCU stack) → edit `patches/<overlay>.patch`.
   * Never mix variant-only code into the base tree "for convenience". That is what the patch is for.
-* **Roots**: `vanilla`, `apatch`, `folkpatch`, `ksu`. `apatch`/`folkpatch` bundle the matching KernelPatch manager APK and auto-flash it during kernel flash; `ksu` builds the ReSukiSU submodule with NoMount/SuSFS/KSU-Next manager sign; `vanilla` is the untouched base.
+* **Roots**: `vanilla`, `apatch`, `folkpatch`, `ksu`. `apatch`/`folkpatch` bundle the matching KernelPatch manager APK and auto-flash it during kernel flash; `ksu` builds the BakaSU submodule with NoMount/SuSFS and accepts both BakaSU and KernelSU-Next managers; `vanilla` is the untouched base.
 * **Selecting a variant**: `VARIANT=<root>[,<overlay>] ./build.sh all` (e.g. `VARIANT=ksu,c2`, `VARIANT=folkpatch,miui`). CI does the same through the **Build & Release** workflow inputs (`root`, `miui`, `c2`). `miui` and `c2` are mutually exclusive.
 * **Patch contract** (enforced in review):
   1. Applies to a clean `onyx` tree with `git apply --check patches/<name>.patch` — no fuzz, no `--3way`.
   2. Contains only kernel sources/configs relevant to the variant: `arch/arm64/configs`, `drivers`, `fs`, `include`, `kernel`, `lib`, `mm`, `net`, `security`, `scripts`, `ksu-patches`, `.gitmodules` / `KernelSU` (submodule gitlink). **No** `build.sh`, `.github/`, `README*`, `AGENTS.md`, `CHANGELOG*` or `.gitignore` hunks.
-  3. Defconfigs follow the resolver names (`begonia_apatch_defconfig`, `reksun_defconfig`, …).
+  3. Defconfigs follow the resolver names (`begonia_apatch_defconfig`, `bakasu_defconfig`, …).
   4. Root patches are applied before overlays; keep them independently applicable.
   5. Fixes that belong inside the KernelSU submodule are **not** committed there: add them to `ksu-patches/ksu/*.patch`, which `build.sh` applies with `--directory=KernelSU` after the submodule checkout.
 * **Updating a patch** (the only sanctioned workflow):

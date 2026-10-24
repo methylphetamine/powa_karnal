@@ -36,7 +36,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-${{ github.ref }}-${{ github.event.inputs.root || 'push' }}
+  # Overlay choices are part of the key so `ksu` and `ksu,c2` can build in
+  # parallel instead of cancelling each other.
+  group: build-${{ github.ref }}-${{ github.event.inputs.root || 'push' }}-${{ github.event.inputs.miui || '0' }}-${{ github.event.inputs.c2 || '0' }}
   cancel-in-progress: true
 
 jobs:
