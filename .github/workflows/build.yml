@@ -54,7 +54,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Only build.sh's changelog (git log -n 15) needs history. Fetching
+          # all 750k+ commits made checkout the longest step on every run.
+          fetch-depth: 50
           # Variant patches add the KernelSU gitlink; build.sh initialises it
           # after applying them.
           submodules: false
