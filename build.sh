@@ -92,7 +92,7 @@ fi
 # build time.
 #
 #   VARIANT=vanilla          stock build, no patches
-#   VARIANT=ksu              BakaSU + NoMount + SuSFS + BakaSU/KSU-Next manager
+#   VARIANT=ksu              BakaSU + NoMount + SuSFS + multi-manager signs
 #   VARIANT=ksu,c2           KSU root + Codec2 overlay
 #   VARIANT=apatch,miui      APatch root (auto-flashed) + MIUI overlay
 #   VARIANT=folkpatch        FolkPatch root (same kernel, FolkPatch package)

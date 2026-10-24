@@ -14,7 +14,7 @@ This document establishes the **mandatory, non-negotiable rules** for all AI age
   * Anything that only exists because of a root flavor (KernelSU submodule, KSU/SuSFS/NoMount glue, root defconfig) → edit the matching `patches/<root>.patch` and regenerate it.
   * Anything that only exists for a media overlay (WLAN/HyperOS knobs, MTK VCODEC/VCU stack) → edit `patches/<overlay>.patch`.
   * Never mix variant-only code into the base tree "for convenience". That is what the patch is for.
-* **Roots**: `vanilla`, `apatch`, `folkpatch`, `ksu`. `apatch`/`folkpatch` bundle the matching KernelPatch manager APK and auto-flash it during kernel flash; `ksu` builds the BakaSU submodule with NoMount/SuSFS and accepts both BakaSU and KernelSU-Next managers; `vanilla` is the untouched base.
+* **Roots**: `vanilla`, `apatch`, `folkpatch`, `ksu`. `apatch`/`folkpatch` bundle the matching KernelPatch manager APK and auto-flash it during kernel flash; `ksu` builds the BakaSU submodule with NoMount/SuSFS and accepts BakaSU plus every other manager in its multi-manager signing list (KernelSU-Next, SukiSU-Ultra, RKSU, MKSU, …); `vanilla` is the untouched base.
 * **Selecting a variant**: `VARIANT=<root>[,<overlay>] ./build.sh all` (e.g. `VARIANT=ksu,c2`, `VARIANT=folkpatch,miui`). CI does the same through the **Build & Release** workflow inputs (`root`, `miui`, `c2`). `miui` and `c2` are mutually exclusive.
 * **Patch contract** (enforced in review):
   1. Applies to a clean `onyx` tree with `git apply --check patches/<name>.patch` — no fuzz, no `--3way`.
