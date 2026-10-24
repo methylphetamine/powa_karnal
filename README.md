@@ -223,7 +223,7 @@ Once booted, open a terminal or run ADB shell:
 ```bash
 # 1. Verify kernel release string
 uname -a
-# Expected: Linux localhost 4.14.357-Pox-1.0.0-Beta-...
+# Expected: Linux localhost 4.14.357-Pox-Apatch-C2 ... (Pox@Poxproject)
 
 # 2. Check gaming mode status
 cat /proc/perfmgr/gaming_mode

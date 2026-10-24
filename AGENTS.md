@@ -58,7 +58,7 @@ This document establishes the **mandatory, non-negotiable rules** for all AI age
   * High-power fast charging (3.0A / 18W) is strictly for dedicated AC wall chargers (`STANDARD_CHARGER` / DCP) and dedicated charging ports.
 * **Linux 64-Character UTS_RELEASE Hard Limit**:
   * The Linux kernel enforces `UTS_RELEASE` length $\le 64$ characters.
-  * Localversion strings must be clamped (e.g., `-Pox-1.0.0-Beta-<Edition>-<hash>`) to never exceed this limit.
+  * The branded localversion is derived from the selected variant (e.g., `-Pox-Apatch-C2`). Explicit `LOCALVERSION` overrides must still be clamped so the whole string stays under 64 characters.
 * **Strict Variant Isolation**:
   * `CONFIG_SULTAN_DEBLOAT=y` is strictly exclusive to the `sultan` variant/patch. Never enable or leak it into the base tree or other variants.
   * APatch, FolkPatch, KernelSU-Next and unrooted builds must remain cleanly separated: root hooks and defconfigs belong in their `patches/<root>.patch`, never in `onyx` itself.
