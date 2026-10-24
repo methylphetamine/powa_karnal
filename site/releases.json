@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T05:24:28+00:00",
+  "generated_at": "2026-10-24T05:32:00+00:00",
   "releases": [
     {
       "tag": "latest-Onyx-APatch",
@@ -12,7 +12,7 @@
       "prerelease": false,
       "draft": false,
       "html_url": "https://github.com/methylphetamine/powa_karnal/releases/tag/latest-Onyx-APatch",
-      "body": "**Onyx-APatch** - Zero Frame-Drop Gaming & APatch Edition\n\n- Variant: `apatch` (root: apatch, patches: apatch)\n- Root package: `APatch_11282_e8e4651_HEAD-release-signed.apk`\n- Defconfig: `begonia_apatch_defconfig`\n- uname -r: `4.14.357-Pox-Apatch`\n- Commit: `4c8f691`\n- SHA256: `079c7a657d33cdac23dcaecb9fd02345b074ed82f7cd6dbd4846b79390d19d13`\n\nFlash `MeTh-Kernel-begonia-1.0.0-Beta-Onyx-APatch-4c8f691.zip` in TWRP/OrangeFox (boot partition).\n- Mirror: https://gofile.io/d/aJUabMo4",
+      "body": "**Onyx-APatch** - Zero Frame-Drop Gaming & APatch Edition\n\n- Variant: `apatch` (root: apatch, patches: apatch)\n- Root package: `APatch_11282_e8e4651_HEAD-release-signed.apk`\n- Defconfig: `begonia_apatch_defconfig`\n- uname -r: `4.14.357-Pox-Apatch`\n- Commit: `4c8f691`\n- SHA256: `079c7a657d33cdac23dcaecb9fd02345b074ed82f7cd6dbd4846b79390d19d13`\n\nFlash `Pox-1.0.0-Beta-Onyx-APatch-4c8f691-begonia.zip` in TWRP/OrangeFox (boot partition).\n- Mirror: https://gofile.io/d/aJUabMo4",
       "sha256": "079c7a657d33cdac23dcaecb9fd02345b074ed82f7cd6dbd4846b79390d19d13",
       "mirror": "https://gofile.io/d/aJUabMo4",
       "assets": [
@@ -22,9 +22,9 @@
           "url": "https://github.com/methylphetamine/powa_karnal/releases/download/latest-Onyx-APatch/Image.gz-dtb"
         },
         {
-          "name": "MeTh-Kernel-begonia-1.0.0-Beta-Onyx-APatch-4c8f691.zip",
+          "name": "Pox-1.0.0-Beta-Onyx-APatch-4c8f691-begonia.zip",
           "size": 31187833,
-          "url": "https://github.com/methylphetamine/powa_karnal/releases/download/latest-Onyx-APatch/MeTh-Kernel-begonia-1.0.0-Beta-Onyx-APatch-4c8f691.zip"
+          "url": "https://github.com/methylphetamine/powa_karnal/releases/download/latest-Onyx-APatch/Pox-1.0.0-Beta-Onyx-APatch-4c8f691-begonia.zip"
         }
       ]
     },
@@ -39,7 +39,7 @@
       "prerelease": false,
       "draft": false,
       "html_url": "https://github.com/methylphetamine/powa_karnal/releases/tag/latest-Onyx-KSU",
-      "body": "**Onyx-KSU** - Zero Frame-Drop Gaming & KernelSU-Next + BakaSU Edition\n\n- Variant: `ksu` (root: ksu, patches: ksu)\n- Defconfig: `bakasu_defconfig`\n- uname -r: `4.14.357-Pox-KSU`\n- Commit: `4c8f691`\n- SHA256: `44f3cd30d8511511c887ec790ac40d9a342296dedeebfc2165abbd8e75033b55`\n\nFlash `MeTh-Kernel-begonia-1.0.0-Beta-Onyx-KSU-4c8f691.zip` in TWRP/OrangeFox (boot partition).\n- Mirror: https://gofile.io/d/k37FlP2o",
+      "body": "**Onyx-KSU** - Zero Frame-Drop Gaming & KernelSU-Next + BakaSU Edition\n\n- Variant: `ksu` (root: ksu, patches: ksu)\n- Defconfig: `bakasu_defconfig`\n- uname -r: `4.14.357-Pox-KSU`\n- Commit: `4c8f691`\n- SHA256: `44f3cd30d8511511c887ec790ac40d9a342296dedeebfc2165abbd8e75033b55`\n\nFlash `Pox-1.0.0-Beta-Onyx-KSU-4c8f691-begonia.zip` in TWRP/OrangeFox (boot partition).\n- Mirror: https://gofile.io/d/k37FlP2o",
       "sha256": "44f3cd30d8511511c887ec790ac40d9a342296dedeebfc2165abbd8e75033b55",
       "mirror": "https://gofile.io/d/k37FlP2o",
       "assets": [
@@ -49,9 +49,9 @@
           "url": "https://github.com/methylphetamine/powa_karnal/releases/download/latest-Onyx-KSU/Image.gz-dtb"
         },
         {
-          "name": "MeTh-Kernel-begonia-1.0.0-Beta-Onyx-KSU-4c8f691.zip",
+          "name": "Pox-1.0.0-Beta-Onyx-KSU-4c8f691-begonia.zip",
           "size": 22023673,
-          "url": "https://github.com/methylphetamine/powa_karnal/releases/download/latest-Onyx-KSU/MeTh-Kernel-begonia-1.0.0-Beta-Onyx-KSU-4c8f691.zip"
+          "url": "https://github.com/methylphetamine/powa_karnal/releases/download/latest-Onyx-KSU/Pox-1.0.0-Beta-Onyx-KSU-4c8f691-begonia.zip"
         }
       ]
     }

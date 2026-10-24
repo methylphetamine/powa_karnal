@@ -51,7 +51,7 @@ jobs:
     name: Build begonia kernel
     runs-on: ubuntu-24.04
     env:
-      KERNEL_NAME: MeTh-Kernel-begonia
+      KERNEL_NAME: Pox
       TC_ROOT: ${{ github.workspace }}/toolchains
       OUT_DIR: out
       # TheRagingBeast (TRB) Clang 18.0.0, pinned by kerdevdep/setup_kerdevdep.sh
