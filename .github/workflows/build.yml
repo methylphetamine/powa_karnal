@@ -4,6 +4,11 @@ on:
   push:
     branches: [onyx]
     tags: ['v*']
+    # Docs and the downloads site do not affect the kernel image.
+    paths-ignore:
+      - 'site/**'
+      - '**/*.md'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
     inputs:
       root:
@@ -275,6 +280,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOFILE_LINK: ${{ steps.gofile.outputs.link }}
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -295,6 +301,12 @@ jobs:
             "- SHA256: \`${ZIP_SHA256}\`" \
             "" \
             "Flash \`${ZIP_NAME}\` in TWRP/OrangeFox (boot partition).")"
+
+          # The downloads site links to this mirror so visitors without repo
+          # access can still fetch the zip.
+          if [[ -n "${GOFILE_LINK:-}" ]]; then
+            NOTES+=$'\n'"- Mirror: ${GOFILE_LINK}"
+          fi
 
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"

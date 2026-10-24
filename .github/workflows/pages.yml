@@ -1,0 +1,84 @@
+name: Deploy downloads site
+
+on:
+  push:
+    branches: [onyx]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_run:
+    # Refresh the release index whenever a build finishes. Pages keeps the
+    # last successful deployment if this job fails.
+    workflows: ['Build & Release']
+    types: [completed]
+    branches: [onyx]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      pages-enabled: ${{ steps.pages.outcome == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: onyx
+
+      - name: Build release index
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          rsync -a --exclude 'generate_releases.py' site/ _site/
+          python3 site/generate_releases.py --out _site/releases.json
+
+      - name: Upload site bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pox-kernel-site
+          path: _site
+          retention-days: 30
+
+      # Private repositories need a plan with GitHub Pages support. When Pages
+      # is unavailable this step fails softly, the bundle above can still be
+      # hosted anywhere, and the job stays green.
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+
+      - name: Warn when Pages is unavailable
+        if: steps.pages.outcome != 'success'
+        run: |
+          echo "::notice title=GitHub Pages unavailable::Enable Settings → Pages → Source: GitHub Actions, or host the 'pox-kernel-site' artifact on any static host."
+
+      - name: Upload Pages artifact
+        if: steps.pages.outcome == 'success'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages-enabled == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

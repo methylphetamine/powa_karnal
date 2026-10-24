@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pox Kernel — Downloads</title>
+  <meta name="description" content="Download the latest Pox Kernel builds for the Redmi Note 8 Pro (begonia).">
+  <meta name="theme-color" content="#0b0f0d">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="./">
+      <span class="brand-mark">P</span>
+      <span class="brand-text">
+        <strong>Pox Kernel</strong>
+        <small>Redmi Note 8 Pro · begonia</small>
+      </span>
+    </a>
+    <nav class="site-nav">
+      <a href="#releases">Releases</a>
+      <a href="#install">Install</a>
+      <a class="nav-gh" href="https://github.com/methylphetamine/powa_karnal" rel="noopener">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Linux 4.14 · MediaTek Helio G90T</p>
+      <h1>Performance you can<br><span class="grad">flash.</span></h1>
+      <p class="lede">
+        Gaming-focused kernel builds with selectable root flavors and media
+        overlays. Pick a build, check the SHA-256, flash the zip.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#releases">Browse releases</a>
+        <a class="btn btn-ghost" href="#install">How to install</a>
+      </div>
+      <p class="build-stamp" id="build-stamp">Loading release index…</p>
+    </section>
+
+    <section id="releases" class="section">
+      <div class="section-head">
+        <div>
+          <h2>Releases</h2>
+          <p class="muted">Newest first. Mirrors open without a GitHub account.</p>
+        </div>
+        <div class="filters" id="filters" role="group" aria-label="Filter by root">
+          <button class="chip is-active" data-filter="all" type="button">All</button>
+          <button class="chip" data-filter="ksu" type="button">KSU</button>
+          <button class="chip" data-filter="apatch" type="button">APatch</button>
+          <button class="chip" data-filter="folkpatch" type="button">FolkPatch</button>
+          <button class="chip" data-filter="vanilla" type="button">Vanilla</button>
+        </div>
+      </div>
+
+      <div id="release-list" class="release-list" aria-live="polite"></div>
+
+      <div id="empty-state" class="empty" hidden>
+        <span class="empty-icon">📦</span>
+        <h3>No releases published yet</h3>
+        <p>
+          Builds appear here once a workflow run publishes a GitHub release.
+          Until then you can grab artifacts from
+          <a href="https://github.com/methylphetamine/powa_karnal/actions" rel="noopener">GitHub Actions</a>.
+        </p>
+      </div>
+
+      <div id="error-state" class="empty" hidden>
+        <span class="empty-icon">⚠️</span>
+        <h3>Could not load releases</h3>
+        <p id="error-detail">The release index is unavailable right now.</p>
+      </div>
+    </section>
+
+    <section id="install" class="section install">
+      <h2>Install</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            <h3>Back up your boot image</h3>
+            <p>Keep a copy of the current <code>boot</code> partition so you can roll back.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>
+            <h3>Verify the download</h3>
+            <p>Compare the file's SHA-256 with the value on its release card before flashing.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            <h3>Flash the zip</h3>
+            <p>Install <code>*.zip</code> from TWRP / OrangeFox on the <code>boot</code> partition, then reboot.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <div>
+            <h3>Install the root manager</h3>
+            <p>
+              KSU builds accept the BakaSU or KernelSU-Next manager.
+              APatch and FolkPatch builds bundle their manager installer.
+            </p>
+          </div>
+        </li>
+      </ol>
+      <p class="warn">
+        Flashing a custom kernel can brick your device. Unlock the bootloader,
+        use a matching firmware base, and flash at your own risk.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Pox Kernel · built for begonia</p>
+    <p class="muted">
+      <a href="https://github.com/methylphetamine/powa_karnal" rel="noopener">Source</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/methylphetamine/powa_karnal/actions" rel="noopener">Actions</a>
+    </p>
+  </footer>
+
+  <template id="release-template">
+    <article class="release-card">
+      <div class="release-top">
+        <div class="release-title">
+          <span class="badge badge-latest" hidden>Latest</span>
+          <h3></h3>
+          <p class="release-sub"></p>
+        </div>
+        <div class="release-chips"></div>
+      </div>
+      <dl class="release-meta">
+        <div><dt>Kernel</dt><dd data-field="kernel"></dd></div>
+        <div><dt>Commit</dt><dd data-field="commit"></dd></div>
+        <div><dt>Published</dt><dd data-field="date"></dd></div>
+        <div><dt>Size</dt><dd data-field="size"></dd></div>
+      </dl>
+      <div class="sha" data-field="sha-wrap">
+        <code data-field="sha"></code>
+        <button class="copy" type="button" data-copy>Copy</button>
+      </div>
+      <div class="release-actions">
+        <a class="btn btn-primary" data-download rel="noopener">Download</a>
+        <a class="btn btn-ghost" data-notes rel="noopener">Release notes</a>
+      </div>
+    </article>
+  </template>
+
+  <script src="assets/app.js" defer></script>
+</body>
+</html>
