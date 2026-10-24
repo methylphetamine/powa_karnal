@@ -135,6 +135,7 @@ jobs:
             echo "APPLIED_PATCHES=$APPLIED_PATCHES"
             echo "DEFCONFIG=$DEFCONFIG"
             echo "COMMIT_HASH=$COMMIT_HASH"
+            echo "COMMIT_SUBJECT=$COMMIT_SUBJECT"
             echo "LINUX_VERSION=$LINUX_VERSION"
             echo "LOCALVERSION=$LOCALVERSION"
             echo "ZIP_SHA256=$ZIP_SHA256"
@@ -212,14 +213,18 @@ jobs:
           def esc(value):
               return html.escape(value or "", quote=False)
 
+          def one_line(value, limit=120):
+              value = " ".join((value or "").split())
+              return value if len(value) <= limit else value[:limit - 1] + "…"
+
           changelog = subprocess.run(
-              ["git", "log", "-n", "6", "--pretty=format:• %h %s"],
-              capture_output=True, text=True).stdout
+              ["git", "log", "-n", "8", "--pretty=format:%h %s"],
+              capture_output=True, text=True).stdout.splitlines()
 
           lines = [
               f"<b>Pox Kernel {esc(os.environ.get('VERSION_NAME'))}</b>",
               f"<b>Commit:</b> <code>{esc(os.environ.get('COMMIT_HASH'))}</code> "
-              f"{esc(os.environ.get('COMMIT_SUBJECT'))}",
+              f"{esc(one_line(os.environ.get('COMMIT_SUBJECT')))}",
               f"<b>Variant:</b> {esc(os.environ.get('VARIANT'))} "
               f"(root: {esc(os.environ.get('ROOT_FLAVOR'))})",
               f"<b>Defconfig:</b> <code>{esc(os.environ.get('DEFCONFIG'))}</code>",
@@ -227,15 +232,18 @@ jobs:
           if os.environ.get("GOFILE_LINK"):
               lines.append(f"<b>Gofile:</b> {esc(os.environ['GOFILE_LINK'])}")
           lines.append(f"<b>Run:</b> {esc(os.environ.get('RUN_URL'))}")
-          lines.append("")
-          lines.append("<b>Changelog</b>")
-          lines.append(esc(changelog))
 
-          caption = "\n".join(lines)
-          # Telegram caps captions at 1024 characters; stay under the limit
-          # after entity parsing and keep the important fields at the top.
-          if len(caption) > 1000:
-              caption = caption[:980].rstrip() + "\n… (truncated)"
+          # Telegram caps captions at 1024 characters. Add changelog entries
+          # while they fit, so a long log can never cut an HTML entity or tag
+          # (which Telegram rejects as "can't parse entities").
+          caption = "\n".join(lines + ["", "<b>Changelog</b>"])
+          for entry in changelog:
+              candidate = f"{caption}\n• {esc(entry)}"
+              if len(candidate) > 1000:
+                  caption += "\n…"
+                  break
+              caption = candidate
+
           with open(os.environ["caption_file"], "w", encoding="utf-8") as fh:
               fh.write(caption)
           PY
