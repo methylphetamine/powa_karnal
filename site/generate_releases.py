@@ -166,7 +166,16 @@ def main() -> int:
 
     if args.input:
         with open(args.input, encoding="utf-8") as handle:
-            raw = json.load(handle)
+            loaded = json.load(handle)
+        # Accept either a raw GitHub releases response (list) or a
+        # previously-generated releases.json payload (dict with "releases").
+        if isinstance(loaded, dict) and isinstance(loaded.get("releases"), list):
+            releases = loaded["releases"]
+            # Already normalized; skip re-normalizing.
+            normalized = False
+        else:
+            raw = loaded
+            normalized = True
     else:
         token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
         repository = os.environ.get("GITHUB_REPOSITORY")
@@ -174,12 +183,14 @@ def main() -> int:
             print("GITHUB_REPOSITORY is required", file=sys.stderr)
             return 2
         raw = fetch_releases(repository, token)
+        normalized = True
 
-    releases = [
-        normalize(item)
-        for item in raw
-        if not item.get("draft")
-    ]
+    if normalized:
+        releases = [
+            normalize(item)
+            for item in raw
+            if not item.get("draft")
+        ]
     releases.sort(key=lambda item: item.get("published_at") or "", reverse=True)
 
     payload = {
