@@ -23,11 +23,6 @@
 
 #include <linux/uaccess.h>
 
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-#include <linux/susfs_def.h>
-#endif
-
-
 int iterate_dir(struct file *file, struct dir_context *ctx)
 {
 	struct inode *inode = file_inode(file);
@@ -125,9 +120,6 @@ struct old_linux_dirent {
 struct readdir_callback {
 	struct dir_context ctx;
 	struct old_linux_dirent __user * dirent;
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	struct super_block *sb;
-#endif
 	int result;
 };
 
@@ -180,9 +172,6 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	buf.sb = f.file->f_inode->i_sb;
-#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (buf.result)
 		error = buf.result;
@@ -210,9 +199,6 @@ struct getdents_callback {
 	struct linux_dirent __user * previous;
 	int count;
 	int error;
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	struct super_block *sb;
-#endif
 };
 
 static int filldir(struct dir_context *ctx, const char *name, int namlen,
@@ -283,9 +269,6 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	buf.sb = f.file->f_inode->i_sb;
-	#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
@@ -306,9 +289,6 @@ struct getdents_callback64 {
 	struct linux_dirent64 __user * previous;
 	int count;
 	int error;
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	struct super_block *sb;
-#endif
 };
 
 static int filldir64(struct dir_context *ctx, const char *name, int namlen,
@@ -374,9 +354,7 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 	f = fdget_pos(fd);
 	if (!f.file)
 		return -EBADF;
-	#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	buf.sb = f.file->f_inode->i_sb;
-	#endif
+
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
@@ -403,9 +381,6 @@ struct compat_old_linux_dirent {
 struct compat_readdir_callback {
 	struct dir_context ctx;
 	struct compat_old_linux_dirent __user *dirent;
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	struct super_block *sb;
-#endif
 	int result;
 };
 
@@ -459,9 +434,6 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	buf.sb = f.file->f_inode->i_sb;
-	#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (buf.result)
 		error = buf.result;
@@ -483,9 +455,6 @@ struct compat_getdents_callback {
 	struct compat_linux_dirent __user *previous;
 	int count;
 	int error;
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	struct super_block *sb;
-#endif
 };
 
 static int compat_filldir(struct dir_context *ctx, const char *name, int namlen,
@@ -553,9 +522,6 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	buf.sb = f.file->f_inode->i_sb;
-	#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;

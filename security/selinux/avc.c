@@ -28,7 +28,6 @@
 #include <net/af_unix.h>
 #include <linux/ip.h>
 #include <linux/audit.h>
-#include <linux/jump_label.h>
 #include <linux/ipv6.h>
 #include <net/ipv6.h>
 #include "avc.h"
@@ -43,10 +42,6 @@
 #define avc_cache_stats_incr(field)	this_cpu_inc(avc_cache_stats.field)
 #else
 #define avc_cache_stats_incr(field)	do {} while (0)
-#endif
-
-#ifdef CONFIG_KSU_SUSFS
-DECLARE_STATIC_KEY_FALSE(susfs_is_avc_log_spoofing_enabled);
 #endif
 
 struct avc_entry {
@@ -192,7 +187,6 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 	}
 
 	rc = security_sid_to_context(state, tsid, &scontext, &scontext_len);
-
 	if (rc)
 		audit_log_format(ab, " tsid=%d", tsid);
 	else {
