@@ -5286,7 +5286,7 @@ index 000000000..692a81252
 +CONFIG_KSU_FULL_NAME_FORMAT=y
 +# CONFIG_KSU_DISABLE_MANAGER is not set
 +# CONFIG_KSU_DISABLE_POLICY is not set
-+# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set
++CONFIG_KSU_MULTI_MANAGER_SUPPORT=y
 +# CONFIG_KSU_TRACEPOINT_HOOK is not set
 +CONFIG_KSU_MANUAL_HOOK=y
 +CONFIG_KSU_SUSFS=y
@@ -11591,6 +11591,32 @@ index 66c1fd251..1cfbbec7d 100644
  	if (error)
  		goto out;
  
+diff --git a/ksu-patches/ksu/0001-restrict-to-bakasu-signature.patch b/ksu-patches/ksu/0001-restrict-to-bakasu-signature.patch
+new file mode 100644
+index 000000000..2ab02d4832277a2c47b9528fec4553f478b3921d
+--- /dev/null
++++ b/ksu-patches/ksu/0001-restrict-to-bakasu-signature.patch
+@@ -0,0 +1,20 @@
++diff --git a/kernel/manager/apk_sign.c b/kernel/manager/apk_sign.c
++--- a/kernel/manager/apk_sign.c
+++++ b/kernel/manager/apk_sign.c
++@@ -33,16 +33,6 @@
++ 
++ static apk_sign_key_t apk_sign_keys[] = {
++     { EXPECTED_SIZE_BAKASU, EXPECTED_HASH_BAKASU }, /* Baka-SU/BakaSU */
++-#ifdef CONFIG_KSU_MULTI_MANAGER_SUPPORT
++-    { EXPECTED_SIZE_OFFICIAL, EXPECTED_HASH_OFFICIAL }, // tiann/KernelSU
++-    { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, // KOWX712/KernelSU
++-#ifdef EXPECTED_SIZE
++-    { EXPECTED_SIZE, EXPECTED_HASH }, // Custom
++-#endif
++-#ifdef EXPECTED_PR_BUILD_SIZE
++-    { EXPECTED_PR_BUILD_SIZE, EXPECTED_PR_BUILD_HASH }, // Custom 2 (For PR build)
++-#endif
++-#endif
++ };
++ 
++ static struct sdesc *init_sdesc(struct crypto_shash *alg)
 diff --git a/ksu-patches/ksu/0002-allow-susfs-build-on-nongki.patch b/ksu-patches/ksu/0002-allow-susfs-build-on-nongki.patch
 new file mode 100644
 index 000000000..97e0bf950
