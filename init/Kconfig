@@ -554,6 +554,20 @@ config IKCONFIG_PROC
 	  This option enables access to the kernel configuration file
 	  through /proc/config.gz.
 
+config IKCONFIG_STOCK_DEFCONFIG
+	bool "Report the stock configuration through /proc/config.gz"
+	depends on IKCONFIG_PROC
+	depends on ARM64
+	---help---
+	  Use the stock defconfig shipped with the kernel tree as the source
+	  of the configuration exposed through /proc/config.gz instead of the
+	  configuration the running kernel was built with.
+
+	  Some vendor userspace implementations compare the running kernel
+	  configuration against the stock configuration and warn when they
+	  differ. Enable this to keep the vendor configuration visible to
+	  userspace while still allowing the kernel to be customized.
+
 config IKHEADERS
 	tristate "Enable kernel headers through /sys/kernel/kheaders.tar.xz"
 	depends on SYSFS
