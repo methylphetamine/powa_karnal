@@ -6502,6 +6502,26 @@ diff --git a/arch/arm64/boot/dts/mediatek/xiaomi-mt6785-common.dtsi b/arch/arm64
  #include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/interrupt-controller/arm-gic.h>
  #include <dt-bindings/pinctrl/mt6785-pinfunc.h>
+diff --git a/arch/arm64/configs/bakasu_defconfig b/arch/arm64/configs/bakasu_defconfig
+--- a/arch/arm64/configs/bakasu_defconfig
++++ b/arch/arm64/configs/bakasu_defconfig
+@@ -593,13 +593,13 @@
+ # CONFIG_CMDLINE_EXTEND is not set
+ # CONFIG_CMDLINE_FORCE is not set
+ # CONFIG_EFI is not set
+-# CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE is not set
++CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE=y
+ CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE=y
+ CONFIG_IMG_GZ_DTB=y
+ # CONFIG_IMG_DTB is not set
+ CONFIG_BUILD_ARM64_APPENDED_KERNEL_IMAGE_NAME="Image.gz-dtb"
+-CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES="mediatek/begonia mediatek/begoniain"
+-CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES=""
++CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES="mediatek/mt6785"
++CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES="mediatek/begonia"
+ 
+ #
+ # Userspace binary formats
 diff --git a/arch/arm64/configs/begonia_apatch_defconfig b/arch/arm64/configs/begonia_apatch_defconfig
 --- a/arch/arm64/configs/begonia_apatch_defconfig
 +++ b/arch/arm64/configs/begonia_apatch_defconfig
