@@ -11,7 +11,7 @@ when upstream updates land.
 | `vanilla` | none (onyx base) | none |
 | `apatch` | `apatch.patch` (APatch defconfig + NoMount v2.2.0) | latest APatch APK bundled, auto-flashed during kernel flash |
 | `folkpatch` | `apatch.patch` (same KernelPatch-based kernel side) | latest FolkPatch APK bundled, auto-flashed during kernel flash |
-| `ksu` | `ksu.patch` (BakaSU submodule + NoMount v2.2.0 + SuSFS + multi-manager signing keys) | manager installed separately (any supported manager) |
+| `ksu` | `ksu.patch` (BakaSU submodule + NoMount v2.2.0 + SuSFS) | BakaSU manager installed separately |
 
 `apatch` and `folkpatch` produce a zip that, after writing the kernel, extracts
 the bundled manager package and runs its installer against the new boot image
